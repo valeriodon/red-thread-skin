@@ -1,0 +1,336 @@
+/*
+ * Red Thread: a Video.js 10 skin where the whole interface is one piece of string.
+ * The thread, the preview, the pull cord and the two icons are drawn on a canvas by <red-thread>.
+ * The elements styled here are the real Video.js controls: they keep the player operable by
+ * keyboard and assistive technology, and sit invisibly where the canvas draws their look.
+ */
+.rt-skin {
+  --rt-thread: var(--media-accent-color, #ff4530);
+  --rt-ink: #ffffff;
+  --rt-shade: rgb(8 10 16 / 0.55);
+  --rt-radius: var(--media-border-radius, 14px);
+  --rt-font: var(--media-font-family, 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif);
+  --rt-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  container-type: inline-size;
+  color: var(--rt-ink);
+  font-family: var(--rt-font);
+  background: #000;
+  border-radius: var(--rt-radius);
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* A ring for keyboard focus only: clicking the picture focuses the player for hotkeys without one. */
+.rt-skin:focus-visible:not([data-rt-pointer]) {
+  outline: 2px solid var(--rt-thread);
+  outline-offset: 3px;
+}
+
+.rt-skin:fullscreen {
+  border-radius: 0;
+}
+
+.rt-skin > video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: var(--media-object-fit, contain);
+  object-position: var(--media-object-position, center);
+}
+
+/* The skin writes captions itself, so the browser's own rendering stays out of the way. */
+.rt-skin video::-webkit-media-text-track-container {
+  opacity: 0;
+}
+
+.rt-poster,
+.rt-poster img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.rt-poster:not([data-visible]) {
+  display: none;
+}
+
+/* Soft shade at the top so the time and icons read on any footage. */
+.rt-skin::before {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 32%;
+  pointer-events: none;
+  content: '';
+  background: linear-gradient(to bottom, var(--rt-shade), rgb(8 10 16 / 0));
+}
+
+.rt-thread {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+}
+
+.rt-thread canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+
+.rt-controls {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: block;
+  pointer-events: none;
+}
+
+.rt-top {
+  position: absolute;
+  inset: 0 0 auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: clamp(8px, 2cqw, 16px) calc(clamp(18px, 4cqw, 40px) + 34px) 0 clamp(12px, 3cqw, 26px);
+  transition: opacity 240ms ease;
+}
+
+.rt-top:not([data-visible]) {
+  opacity: 0;
+}
+
+.rt-time {
+  font: 500 12.5px / 1 var(--rt-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.rt-chapter {
+  min-width: 0;
+  overflow: hidden;
+  font: 500 12.5px / 1 var(--rt-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+
+.rt-spacer {
+  flex: 1;
+}
+
+/* Real buttons, drawn by the canvas underneath them. */
+.rt-button {
+  display: block;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  outline: none;
+}
+
+.rt-button:focus-visible {
+  outline: 2px solid var(--rt-ink);
+  outline-offset: 1px;
+}
+
+.rt-button[data-hidden],
+.rt-button[hidden] {
+  display: none;
+}
+
+/* The mute button sits on the pull cord's anchor, top right. */
+.rt-mute-button {
+  position: absolute;
+  top: 0;
+  right: calc(clamp(18px, 4cqw, 40px) - 18px);
+  pointer-events: none;
+}
+
+/* Thumb-sized targets on touch screens. */
+@media (pointer: coarse) {
+  .rt-top .rt-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .rt-top {
+    gap: 6px;
+  }
+}
+
+/* The play button covers the middle of the picture; the canvas takes the pointer. */
+.rt-play-button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(64px, 26cqw, 180px);
+  height: clamp(64px, 26cqw, 180px);
+  pointer-events: none;
+  border-radius: 12px;
+  translate: -50% -50%;
+}
+
+/* The time slider lies along the thread; the canvas draws it and takes the pointer. */
+.rt-time-slider {
+  position: absolute;
+  right: clamp(18px, 4cqw, 40px);
+  bottom: 4%;
+  left: clamp(18px, 4cqw, 40px);
+  display: block;
+  height: 14%;
+  pointer-events: none;
+  border-radius: 8px;
+  outline: none;
+}
+
+.rt-time-slider:focus-visible,
+.rt-time-slider:has(:focus-visible) {
+  outline: 2px solid var(--rt-ink);
+  outline-offset: 2px;
+}
+
+.rt-slider-track,
+.rt-slider-thumb {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+.rt-captions {
+  position: absolute;
+  top: 15%;
+  left: 50%;
+  z-index: 3;
+  max-width: 74%;
+  font: 500 clamp(13px, 2.5cqw, 22px) / 1.3 var(--rt-font);
+  text-align: center;
+  text-wrap: balance;
+  text-shadow: 0 1px 10px rgb(0 0 0 / 0.6);
+  white-space: pre-line;
+  pointer-events: none;
+  translate: -50% 0;
+}
+
+.rt-captions[hidden] {
+  display: none;
+}
+
+/* Each new line is written out left to right, with a thread drawn under it. */
+.rt-captions span {
+  display: inline-block;
+  padding-bottom: 7px;
+  background: linear-gradient(var(--rt-thread), var(--rt-thread)) left bottom / 100% 2px no-repeat;
+}
+
+.rt-captions[data-in] span {
+  animation: rt-caption-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes rt-caption-in {
+  from {
+    clip-path: inset(0 100% 0 0);
+    background-size: 0 2px;
+  }
+
+  to {
+    clip-path: inset(0 0 0 0);
+    background-size: 100% 2px;
+  }
+}
+
+.rt-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: rgb(8 10 16 / 0.7);
+}
+
+.rt-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 5;
+  display: grid;
+  gap: 8px;
+  width: min(86%, 360px);
+  padding: 18px 20px;
+  color: #11151b;
+  font: 400 14px / 1.45 var(--rt-font);
+  background: #fff;
+  border-top: 3px solid var(--rt-thread);
+  border-radius: 8px;
+  translate: -50% -50%;
+}
+
+.rt-dialog:not([data-open]),
+.rt-dialog-backdrop:not([data-open]) {
+  display: none;
+}
+
+.rt-dialog-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.rt-dialog-close {
+  justify-self: start;
+  padding: 6px 14px;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  background: #11151b;
+  border-radius: 99px;
+}
+
+.rt-status-announcer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .rt-chapter {
+    display: none;
+  }
+
+  .rt-top {
+    gap: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rt-captions[data-in] span {
+    animation: none;
+  }
+
+  .rt-top {
+    transition: none;
+  }
+}

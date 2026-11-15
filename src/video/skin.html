@@ -1,0 +1,51 @@
+<media-container class="media-skin rt-skin" data-preset="video">
+<!-- Add a compatible media component here. -->
+<media-poster class="rt-poster">
+<img alt="" decoding="async">
+</media-poster>
+<div class="rt-captions" aria-hidden="true"><span></span></div>
+<red-thread class="rt-thread"></red-thread>
+<media-controls class="rt-controls">
+<media-controls-content class="rt-top">
+<media-time-group class="rt-time">
+<media-time type="current"></media-time>
+<media-time-separator> / </media-time-separator>
+<media-time type="duration"></media-time>
+</media-time-group>
+<span class="rt-chapter"></span>
+<span class="rt-spacer"></span>
+<media-captions-button class="rt-button rt-captions-button"></media-captions-button>
+<media-fullscreen-button class="rt-button rt-fullscreen-button"></media-fullscreen-button>
+<media-mute-button class="rt-button rt-mute-button"></media-mute-button>
+</media-controls-content>
+<media-play-button class="rt-button rt-play-button"></media-play-button>
+<media-time-slider class="rt-time-slider">
+<media-slider-track class="rt-slider-track">
+<media-slider-fill></media-slider-fill>
+</media-slider-track>
+<media-slider-thumb class="rt-slider-thumb"></media-slider-thumb>
+</media-time-slider>
+</media-controls>
+<media-error-dialog>
+<media-dialog-backdrop class="rt-dialog-backdrop"></media-dialog-backdrop>
+<media-dialog-popup class="rt-dialog">
+<media-dialog-title class="rt-dialog-title"></media-dialog-title>
+<media-dialog-description class="rt-dialog-description"></media-dialog-description>
+<media-dialog-close class="rt-dialog-close"></media-dialog-close>
+</media-dialog-popup>
+</media-error-dialog>
+<media-hotkey keys="Space" action="togglePaused"></media-hotkey>
+<media-hotkey keys="k" action="togglePaused"></media-hotkey>
+<media-hotkey keys="m" action="toggleMuted"></media-hotkey>
+<media-hotkey keys="ArrowRight" action="seekStep" value="5"></media-hotkey>
+<media-hotkey keys="ArrowLeft" action="seekStep" value="-5"></media-hotkey>
+<media-hotkey keys="l" action="seekStep" value="10"></media-hotkey>
+<media-hotkey keys="j" action="seekStep" value="-10"></media-hotkey>
+<media-hotkey keys="ArrowUp" action="volumeStep" value="0.1"></media-hotkey>
+<media-hotkey keys="ArrowDown" action="volumeStep" value="-0.1"></media-hotkey>
+<media-hotkey keys="0-9" action="seekToPercent"></media-hotkey>
+<media-hotkey keys="Home" action="seekToPercent" value="0"></media-hotkey>
+<media-hotkey keys="End" action="seekToPercent" value="100"></media-hotkey>
+<media-hotkey keys="c" action="toggleSubtitles"></media-hotkey>
+<media-status-announcer class="rt-status-announcer"></media-status-announcer>
+</media-container>
