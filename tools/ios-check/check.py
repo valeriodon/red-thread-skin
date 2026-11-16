@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """Red Thread in Safari on an iPhone simulator, with real touches (Appium, XCUITest driver).
 
-For each page: tap the picture and report whether the film plays; then captions and fullscreen.
-Usage: check.py <simulator udid> <output dir> [name=url=selector-of-the-player ...]
+For each page: tap the picture and report whether the film plays; with the mode "full" also the tap that only
+brings the controls back, captions and fullscreen.
+Usage: check.py <simulator udid> <output dir> [name@@url@@selector-of-the-player[@@mode] ...]
+Modes: play (default), full, and four for a page that hands the media its address at the first gesture
+(mux-video with data-src): auto and metadata set that preload value before the tap; early and early-none set the
+address five seconds before it, with preload metadata or none.
 Writes results.json and screenshots to the output dir, and prints a summary.
 """
 import json, os, subprocess, sys, time
@@ -11,8 +15,8 @@ from appium import webdriver
 from appium.options.ios import XCUITestOptions
 
 UDID, OUT = sys.argv[1], sys.argv[2]
-PAGES = [a.split('=', 2) for a in sys.argv[3:]] or [
-    ['demo', 'https://red-thread-skin.vercel.app/preview.html', 'media-container'],
+PAGES = [(a.split('@@') + ['play'])[:4] for a in sys.argv[3:]] or [
+    ['demo', 'https://red-thread-skin.vercel.app/preview.html', 'media-container', 'full'],
 ]
 os.makedirs(OUT, exist_ok=True)
 
@@ -95,16 +99,17 @@ def shot(name):
 
 
 class Page:
-    def __init__(self, name, url, sel):
-        self.name, self.url, self.sel, self.cal = name, url, sel, None
+    def __init__(self, name, url, sel, mode):
+        self.name, self.url, self.sel, self.mode, self.cal = name, url, sel, mode, None
         self.steps = []
 
     def state(self, label):
         s = d.execute_script(STATE, self.sel)
         s['step'] = label
         self.steps.append(s)
-        log('  [%s] %s: paused=%s t=%s dur=%s waiting=%s err=%s inner=%s events=%s errors=%s' % (
-            self.name, label, s['paused'], s['t'], s['duration'], s['waiting'], s['error'], json.dumps(s['inner']), s['events'], s['errors']))
+        log('  [%s] %s: paused=%s t=%s waiting=%s bar=%s subtitles=%s fullscreen=%s skin=%s view=%sx%s caption=%s err=%s inner=%s events=%s errors=%s' % (
+            self.name, label, s['paused'], s['t'], s['waiting'], s['topVisible'], s['subtitles'], s['isFullscreen'], s['skin'], s['view']['iw'], s['view']['ih'],
+            json.dumps(s['caption']), s['error'], json.dumps(s['inner']), s['events'], s['errors']))
         return s
 
     def calibrate(self):
@@ -140,76 +145,72 @@ class Page:
         time.sleep(1.5)
         d.execute_script(HOOKS)
         self.calibrate()
+        if self.mode in ('auto', 'metadata'):
+            d.execute_script("document.querySelector('mux-video').setAttribute('preload', arguments[0]); return true;", self.mode)
+        elif self.mode in ('early', 'early-none'):
+            d.execute_script("var m = document.querySelector('mux-video'); m.setAttribute('preload', arguments[0]); m.setAttribute('src', m.dataset.src); return true;",
+                             'metadata' if self.mode == 'early' else 'none')
+            time.sleep(5)
         s = self.state('loaded')
         shot(self.name + '-1-loaded')
 
-        # 1. tap the picture: the film must start
+        # 1. tap the picture: the film must start and keep going
         self.tap_picture(s)
-        for wait, label in ((1.0, 'tap +1s'), (2.5, 'tap +3.5s'), (4.0, 'tap +7.5s')):
+        for wait, label in ((1.5, 'tap +1.5s'), (3.0, 'tap +4.5s'), (4.0, 'tap +8.5s')):
             time.sleep(wait)
             s = self.state(label)
         shot(self.name + '-2-after-tap')
-        playing = (s['paused'] is False) and (s['t'] or 0) > 0.5
-        if not playing:
-            # a second tap tells whether only the first gesture is lost
-            if s['paused'] is False:
-                self.tap_picture(s)  # pause
-                time.sleep(1.0)
-                s = self.state('tap 2 (pause)')
-            self.tap_picture(s)
-            for wait, label in ((1.5, 'second play +1.5s'), (5.0, 'second play +6.5s')):
-                time.sleep(wait)
-                s = self.state(label)
-            shot(self.name + '-3-second-tap')
-            playing = (s['paused'] is False) and (s['t'] or 0) > 0.5
-        self.playing = playing
-        if not playing:
+        self.playing = (s['paused'] is False) and (s['t'] or 0) > 1.0
+        if not self.playing or self.mode != 'full':
             return
 
-        # 2. captions: pause (the bar shows), tap the captions button, play, look at where the line sits
+        # 2. with the bar away, a tap only brings it back: the film keeps playing
         try:
+            if s['topVisible']:
+                time.sleep(2.5)
+                s = self.state('bar should be away')
             self.tap_picture(s)
-            time.sleep(1.2)
-            s = self.state('paused for captions')
+            time.sleep(0.8)
+            s = self.state('tap with the bar away (expected: playing, bar back)')
+            # 3. captions
             if s['cc']:
                 self.tap(s['cc'][0], s['cc'][1])
                 time.sleep(0.8)
             d.execute_script("document.querySelector('video-player').store.seek(28.3); return true;")
-            time.sleep(0.8)
-            s = self.state('captions on, paused')
-            self.tap_picture(s)
-            time.sleep(1.2)
+            time.sleep(1.6)
             s = self.state('captions, bar showing')
-            shot(self.name + '-4-captions-bar')
-            d.execute_script("document.querySelector('video-player').store.seek(28.3); return true;")
-            time.sleep(4.2)
+            shot(self.name + '-3-captions-bar')
+            time.sleep(3.0)
             s = self.state('captions, bar away')
-            shot(self.name + '-5-captions-top')
+            shot(self.name + '-4-captions-top')
         except Exception as e:
             log('  captions step failed:', type(e).__name__, str(e)[:200])
 
-        # 3. fullscreen: the skin should fill the window, with no handover to the native player
+        # 4. fullscreen: the skin should fill the window, with no handover to the native player, and keep playing
         try:
             self.tap_picture(s)
-            time.sleep(1.2)
-            s = self.state('paused for fullscreen')
+            time.sleep(0.8)
+            s = self.state('bar back for fullscreen')
             if s['fs']:
                 self.tap(s['fs'][0], s['fs'][1])
-                time.sleep(2.5)
-                s = self.state('after fullscreen tap')
-                shot(self.name + '-6-fullscreen')
+                time.sleep(3.5)
+                s = self.state('after fullscreen tap (expected: playing, skin = window)')
+                shot(self.name + '-5-fullscreen')
+                self.tap_picture(s)
+                time.sleep(0.8)
+                s = self.state('bar back in fullscreen')
                 if s['fs']:
                     self.tap(s['fs'][0], s['fs'][1])
-                    time.sleep(2.5)
-                    self.state('after second fullscreen tap')
-                    shot(self.name + '-7-back')
+                    time.sleep(3.5)
+                    self.state('after second fullscreen tap (expected: playing, skin back)')
+                    shot(self.name + '-6-back')
         except Exception as e:
             log('  fullscreen step failed:', type(e).__name__, str(e)[:200])
 
 
 code = 0
-for name, url, sel in PAGES:
-    page = Page(name, url, sel)
+for name, url, sel, mode in PAGES:
+    page = Page(name, url, sel, mode)
     page.playing = False
     try:
         page.run()

@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
     inputs:
       pages:
-        description: 'Pages to check, as name=url=selector-of-the-player, separated by spaces'
-        default: 'demo=https://red-thread-skin.vercel.app/preview.html=media-container'
+        description: 'Pages to check, as name@@url@@selector-of-the-player@@mode, separated by spaces (modes: see tools/ios-check/check.py)'
+        default: 'demo@@https://red-thread-skin.vercel.app/preview.html@@media-container@@full'
 
 jobs:
   ios:

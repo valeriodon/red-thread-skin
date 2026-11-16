@@ -108,6 +108,9 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   let volDrag = false;
   let volHover = false;
   let tap: { x: number; y: number } | null = null;
+  // On a touch screen, while the film plays with the time and icons away, a tap on the picture only brings
+  // them back, as it would under a mouse just by moving; the next tap pauses.
+  let reveal = false;
   let pend: { x: number; y: number } | null = null;
   // How far the pointer may wander and still count as a tap; a finger wobbles more than a mouse.
   let slop = 5;
@@ -259,7 +262,10 @@ function mount(host: HTMLElement, signal: AbortSignal) {
           touchY = clamp(py - ((SIGNW() * 9) / 16 + 68), 28, HOLD());
           lift = Math.max(0, py - touchY);
         }
-      } else tap = { x: px, y: py };
+      } else {
+        tap = { x: px, y: py };
+        reveal = e.pointerType !== 'mouse' && playing && !!topBar && !topBar.hasAttribute('data-visible');
+      }
     },
     { signal }
   );
@@ -330,9 +336,10 @@ function mount(host: HTMLElement, signal: AbortSignal) {
         if (!RM) cordV += 3;
       }
     } else if (tap && e.type === 'pointerup') {
-      togglePaused();
+      if (!reveal) togglePaused();
     }
     tap = null;
+    reveal = false;
     lift = 0;
   }
   canvas.addEventListener('pointerup', release, { signal });
