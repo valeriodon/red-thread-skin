@@ -8,10 +8,13 @@ on:
       pages:
         description: 'Pages to check, as name@@url@@selector-of-the-player@@mode, separated by spaces (modes: see tools/ios-check/check.py)'
         default: 'demo@@https://red-thread-skin.vercel.app/preview.html@@media-container@@full'
+      runner:
+        description: 'Runner to use (macos-latest; macos-15-intel when the Apple silicon runners are full)'
+        default: 'macos-latest'
 
 jobs:
   ios:
-    runs-on: macos-latest
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
