@@ -76,6 +76,7 @@ def shot(name):
 class Page:
     def __init__(self, name, url, sel, mode):
         self.name, self.url, self.sel, self.mode, self.cal = name, url, sel, mode, None
+        self.playing = False
         self.steps = []
 
     def state(self, label):
@@ -128,8 +129,9 @@ class Page:
         for wait, label in ((1.5, 'tap +1.5s'), (3.0, 'tap +4.5s'), (4.0, 'tap +8.5s')):
             time.sleep(wait)
             s = self.state(label)
+            # seen moving at any of the three looks: on a slow runner the film can be over before the last one
+            self.playing = self.playing or ((s['paused'] is False) and (s['t'] or 0) > 1.0)
         shot(self.name + '-2-after-tap')
-        self.playing = (s['paused'] is False) and (s['t'] or 0) > 1.0
         if not self.playing or self.mode != 'full':
             return
 
