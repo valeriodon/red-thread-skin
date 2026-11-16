@@ -36,7 +36,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   const sx = canvas.getContext('2d') as CanvasRenderingContext2D;
   const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
   let RM = motionQuery.matches;
-  const find =<T extends HTMLElement>(selector: string) => container.querySelector<T>(selector);
+  const find = <T extends HTMLElement>(selector: string) => container.querySelector<T>(selector);
   const ccBtn = find('.rt-captions-button');
   const fsBtn = find('.rt-fullscreen-button');
   const chapterEl = find('.rt-chapter');
