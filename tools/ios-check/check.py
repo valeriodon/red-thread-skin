@@ -90,8 +90,8 @@ class Page:
         s = d.execute_script(STATE, self.sel)
         s['step'] = label
         self.steps.append(s)
-        log('  [%s] %s: paused=%s t=%s waiting=%s bar=%s subtitles=%s fullscreen=%s native=%s skin=%s view=%sx%s share=%s caption=%s err=%s trackEls=%s inner=%s hls=%s events=%s errors=%s' % (
-            self.name, label, s['paused'], s['t'], s['waiting'], s['topVisible'], s['subtitles'], s['isFullscreen'], s['inner'] and s['inner']['mode'], s['skin'], s['view']['iw'], s['view']['ih'], json.dumps(s['window']),
+        log('  [%s] %s: paused=%s t=%s waiting=%s bar=%s ui=%s subtitles=%s fullscreen=%s native=%s skin=%s view=%sx%s share=%s caption=%s err=%s trackEls=%s inner=%s hls=%s events=%s errors=%s' % (
+            self.name, label, s['paused'], s['t'], s['waiting'], s['topVisible'], s['ui'], s['subtitles'], s['isFullscreen'], s['inner'] and s['inner']['mode'], s['skin'], s['view']['iw'], s['view']['ih'], json.dumps(s['window']),
             json.dumps(s['caption']), s['error'], json.dumps(s['trackEls']), json.dumps(s['inner']), json.dumps(s['hls']), s['events'], s['errors']))
         return s
 

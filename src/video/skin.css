@@ -33,6 +33,12 @@
 .rt-skin:focus-visible:not([data-rt-pointer]) {
   outline: 2px solid var(--rt-thread);
   outline-offset: 3px;
+  transition: outline-color 240ms ease;
+}
+
+/* The ring around the whole player steps back with the skin, and any key brings both back. */
+.rt-skin[data-rt-away]:focus-visible:not([data-rt-pointer]) {
+  outline-color: transparent;
 }
 
 .rt-skin:fullscreen {
@@ -92,6 +98,12 @@
   height: 100%;
   cursor: pointer;
   touch-action: pan-y;
+}
+
+/* Left alone while the film plays, the skin fades out (red-thread.ts) and the pointer goes with it. */
+.rt-skin[data-rt-away],
+.rt-skin[data-rt-away] .rt-thread canvas {
+  cursor: none;
 }
 
 .rt-controls {

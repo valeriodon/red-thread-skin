@@ -13,7 +13,7 @@ A Video.js 10 skin where the whole player is one piece of string.
 - **Captions are two strands** that hang loose when off and pull tight when on. Each caption line is written out with a thread drawn under it.
 - **Fullscreen is a thread on four pins.** Click it and four threads reach the corners of the screen, go tight and pull the player open.
 - **Volume is a pull cord** in the top corner. Pull down for more, tap to mute.
-- **While you watch it almost disappears**: a thin line at the bottom edge that trembles with the sound, and carries a bump along it while the video buffers.
+- **While you watch it steps back**: a thin line at the bottom edge that trembles with the sound. Leave the player alone and the whole skin fades out; the pointer, a tap or a key brings it back. While the video buffers it stays, and carries a bump along the thread.
 
 ![Plucking the thread: it bends under the pointer and the preview hangs from it](media/red-thread-pluck.jpg)
 
@@ -100,13 +100,15 @@ Every control is a real Video.js element under the drawing, so Tab reaches capti
 | F | Fullscreen |
 | 0 to 9, Home, End | Jump along the thread |
 
+While the film plays, two seconds without a key, a pointer or a tap and the skin fades out, the ring around the player with it; any key brings both back.
+
 ### Touch
 
 - The caption and fullscreen buttons are 44 px targets on touch screens; the cord and the thread take a finger anywhere near them.
 - Tap the cord's knob to mute, pull it to set the volume. On an iPhone, where the browser leaves loudness to the hardware buttons, the cord is the mute switch: down for sound, up for silence.
 - Under a finger the thread rises above it and goes tight, so the preview hangs in view instead of under the hand. On a small player the time and the icons step back while it does.
-- A finger on the picture scrolls the page, unless it starts on the thread or on the cord.
-- While the film plays and the time and icons are away, the first tap on the picture brings them back and the film keeps playing; the next tap pauses. A tap never lands on a button that is not showing.
+- A finger on the picture scrolls the page, unless it starts on the thread or on the cord while they are showing.
+- Left alone for two seconds while the film plays, the skin fades out. The first tap, anywhere, brings it back and the film keeps playing; the next one acts. A tap never lands on a thread, a cord or a button that is not showing.
 - An iPhone has no fullscreen for a page's own controls, only Apple's player for the bare video. There the four threads pull the player open to fill the window and the skin stays; Safari's own bar stays too, since a page cannot hide it. Only in a small embedded frame does the handover to Apple's player remain.
 - On a player as small as a phone's, caption lines sit under the time and the icons and move up into their place when those are away.
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Red Thread in Safari on a Mac (safaridriver through Selenium): click the picture and report whether the film
-plays, then captions and a pluck of the thread.
+plays (ui= is how much of the skin shows: it fades out when the film is left alone), then captions and a click on
+the thread.
 
 Usage: mac.py <output dir> [name@@url@@selector-of-the-player ...]
 Needs `sudo safaridriver --enable` once. Writes results.json and screenshots, and prints a summary.
@@ -34,8 +35,8 @@ def state(name, sel, label, steps):
     s = d.execute_script(STATE, sel)
     s['step'] = label
     steps.append(s)
-    log('  [%s] %s: paused=%s t=%s waiting=%s subtitles=%s caption=%s err=%s trackEls=%s inner=%s hls=%s events=%s errors=%s' % (
-        name, label, s['paused'], s['t'], s['waiting'], s['subtitles'], json.dumps(s['caption']), s['error'],
+    log('  [%s] %s: paused=%s t=%s waiting=%s ui=%s subtitles=%s caption=%s err=%s trackEls=%s inner=%s hls=%s events=%s errors=%s' % (
+        name, label, s['paused'], s['t'], s['waiting'], s['ui'], s['subtitles'], json.dumps(s['caption']), s['error'],
         json.dumps(s['trackEls']), json.dumps(s['inner']), json.dumps(s['hls']), s['events'], s['errors']))
     return s
 

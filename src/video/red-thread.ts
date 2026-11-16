@@ -152,6 +152,9 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     fs: { h: 0, c: 0, v: 0, at: -9, a: 0 },
   };
   let topA = 1;
+  // The whole drawing: 1 while the skin is awake, 0 when the film has been left alone and it has faded out.
+  let uiA = 1;
+  let shownA = 1;
   let lastCue = '';
 
   const PAD = () => clamp(W * 0.04, 18, 40);
@@ -234,6 +237,8 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     pu = clamp((px - PAD()) / (W - 2 * PAD()), 0, 1);
   }
   const onCord = () => Math.abs(px - CORDX()) < 24 && py < cordLen + 28;
+  /** The film plays and the time and icons have stepped back: the skin is fading out, or gone. */
+  const away = () => playing && !!topBar && !topBar.hasAttribute('data-visible');
 
   canvas.addEventListener(
     'pointerdown',
@@ -248,7 +253,12 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       }
       container.setAttribute('data-rt-pointer', '');
       container.focus({ preventScroll: true });
-      if (onCord()) {
+      if (e.pointerType !== 'mouse' && away()) {
+        // The skin is fading out, or gone: a finger only brings it back, and never plucks a thread or pulls a cord
+        // nobody can see. (A mouse has to move to get there, and moving wakes the skin first.)
+        tap = { x: px, y: py };
+        reveal = true;
+      } else if (onCord()) {
         volDrag = true;
         tap = { x: px, y: py };
       } else if (py > ZONE() && dur) {
@@ -264,7 +274,6 @@ function mount(host: HTMLElement, signal: AbortSignal) {
         }
       } else {
         tap = { x: px, y: py };
-        reveal = e.pointerType !== 'mouse' && playing && !!topBar && !topBar.hasAttribute('data-visible');
       }
     },
     { signal }
@@ -363,7 +372,9 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       const y = t.clientY - r.top;
       const s = getStore();
       const filling = fsm.phase !== 'idle' || s?.isFullscreen;
-      if (filling || y > ZONE() || (Math.abs(x - CORDX()) < 24 && y < cordLen + 28)) e.preventDefault();
+      // With the skin away there is no thread or cord to start on.
+      const held = !away() && (y > ZONE() || (Math.abs(x - CORDX()) < 24 && y < cordLen + 28));
+      if (filling || held) e.preventDefault();
     },
     { passive: false, signal }
   );
@@ -837,7 +848,8 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     lastMedia = tMedia;
     if (pendingTo >= 0 && (Math.abs(tMedia - pendingTo) < 1 || now > pendingUntil)) pendingTo = -1;
 
-    const sliderFocus = focused(sliderEl);
+    // The slider's keyboard focus holds the preview on the thread, until the film is left alone.
+    const sliderFocus = focused(sliderEl) && !away();
     const active = inZone || drag || !!glide || now < signHold || sliderFocus;
     // Start loading the storyboard early, so the first preview already has a picture.
     if (!sprites.size && s.thumbnailsTrack?.cues?.length) spriteAt(s, 0);
@@ -866,6 +878,18 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     container.toggleAttribute('data-rt-preview', dur > 0 && (inZone || drag || !!glide || now < signHold));
     const topT = (!topBar || topBar.hasAttribute('data-visible')) && !crowded ? 1 : 0;
     topA = RM ? topT : topA + (topT - topA) * Math.min(1, dt * 10);
+    // Left alone while the film plays (no pointer, tap or key for two seconds, or the pointer off the player), the
+    // whole skin fades out with the time and the icons, and any of the three brings it back. It stays while it has
+    // something to say or to do: buffering, a preview on the thread, the cord in hand, the stretch to fullscreen.
+    const awake =
+      !away() || waiting || active || volDrag || volHover || intro < 1 || (fsm.phase !== 'idle' && fsm.phase !== 'full');
+    uiA += ((awake ? 1 : 0) - uiA) * Math.min(1, dt * (awake ? 12 : 4));
+    const shown = uiA > 0.996 ? 1 : uiA < 0.004 ? 0 : Math.round(uiA * 200) / 200;
+    if (shown !== shownA) {
+      shownA = shown;
+      canvas.style.opacity = String(shown);
+    }
+    container.toggleAttribute('data-rt-away', !awake);
 
     volumeFixed = s.volumeAvailability === 'unsupported';
     const cordT = muted ? CORD_MUTED : CORD(volumeFixed ? 0.6 : volume);
