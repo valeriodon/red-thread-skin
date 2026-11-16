@@ -7,6 +7,7 @@
     /lab/js          the same, but the player is made by a script once the module has loaded
                      (late and js take ?engine=native, startpos or pad0: see ENGINES; late also takes
                      ?fix=defer, defer-up, reseek or pauseplay: see FIXES)
+    /lab/raw/<kind>  no skin: a bare video, hls.js alone, the media element alone or inside a player (see RAW_KINDS)
     /embed/...       dist-embed/
     anything else    fetched from UPSTREAM, so a live page can be checked with one thing changed: add ?v=static
                      (address in the markup), ?v=static,nocase or ?v=static,nocss to its address
@@ -78,6 +79,66 @@ ARM = '''<script>
 </script>'''
 
 
+# Pages without the skin, to find which layer a fault belongs to: the browser, hls.js, the media element or the
+# player. One button; `window.__state()` reports the video underneath.
+RAW = '''<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Red Thread lab: raw %(kind)s</title>
+<style>body { margin: 0; background: #14110f; color: #eee; font: 16px system-ui; } main { padding: 40px 16px; } video, mux-video { display: block; width: 640px; max-width: 100%%; aspect-ratio: 16 / 9; background: #000; } button { font: 600 22px system-ui; padding: 18px 28px; margin: 0 0 16px; }</style>
+<main><button id="go">Play</button><div id="stage">%(markup)s</div></main>
+%(scripts)s
+<script type="module">
+  %(imports)s
+  const SRC = %(src)s;
+  const go = document.getElementById('go');
+  window.__ev = [];
+  const video = () => { const m = document.querySelector('mux-video'); return m ? m.shadowRoot.querySelector('video') : document.querySelector('video'); };
+  const watch = () => ['loadstart', 'loadedmetadata', 'loadeddata', 'canplay', 'play', 'playing', 'waiting', 'stalled', 'seeking', 'seeked', 'error', 'emptied', 'pause'].forEach((t) => video().addEventListener(t, () => window.__ev.push(t + '@' + Math.round(performance.now()))));
+  window.__state = () => {
+    const v = video(), b = [];
+    for (let i = 0; i < v.buffered.length; i++) b.push([+v.buffered.start(i).toFixed(2), +v.buffered.end(i).toFixed(2)]);
+    return { paused: v.paused, t: +v.currentTime.toFixed(2), readyState: v.readyState, networkState: v.networkState, preload: v.preload, src: String(v.currentSrc || v.src).slice(0, 12), buffered: b, err: v.error ? v.error.code : null, events: window.__ev.splice(0) };
+  };
+  const note = (p) => { if (p && p.catch) p.catch((e) => window.__ev.push('play rejected: ' + e.name)); };
+  %(start)s
+  watch();
+  window.__ready = true;
+</script>
+'''
+
+RAW_KINDS = {
+    # the browser's own HLS: address and play in the same click
+    'native': dict(markup='<video preload="none" playsinline crossorigin></video>',
+                   start="go.addEventListener('click', () => { const v = video(); v.src = SRC; note(v.play()); });"),
+    # the same, with the address at the press and play at the release, as a player that loads on the first gesture
+    'native-down': dict(markup='<video preload="none" playsinline crossorigin></video>',
+                        start="go.addEventListener('pointerdown', () => { video().src = SRC; }); go.addEventListener('click', () => note(video().play()));"),
+    # hls.js on its own, loading as soon as it has the address
+    'hls': dict(markup='<video preload="none" playsinline crossorigin></video>', scripts='<script src="/hlsjs/hls.min.js"></script>',
+                start="go.addEventListener('click', () => { const v = video(), h = new Hls(); h.attachMedia(v); h.loadSource(SRC); note(v.play()); });"),
+    # hls.js told to wait for play before it loads, which is how Video.js maps preload=\"none\"
+    'hls-onplay': dict(markup='<video preload="none" playsinline crossorigin></video>', scripts='<script src="/hlsjs/hls.min.js"></script>',
+                       start="go.addEventListener('pointerdown', () => { const v = video(), h = new Hls({ autoStartLoad: false }); h.attachMedia(v); h.loadSource(SRC); v.addEventListener('play', () => h.startLoad(), { once: true }); }); go.addEventListener('click', () => note(video().play()));"),
+    # the Mux media element with no player around it
+    'mux': dict(markup='<mux-video preload="none" playsinline crossorigin></mux-video>', imports="import '/embed/red-thread.js';",
+                start="const m = document.querySelector('mux-video'); go.addEventListener('pointerdown', () => m.setAttribute('src', SRC)); go.addEventListener('click', () => note(m.play()));"),
+    'mux-auto': dict(markup='<mux-video preload="auto" playsinline crossorigin></mux-video>', imports="import '/embed/red-thread.js';",
+                     start="const m = document.querySelector('mux-video'); go.addEventListener('pointerdown', () => m.setAttribute('src', SRC)); go.addEventListener('click', () => note(m.play()));"),
+    # the element inside a player, still with no skin: the player's store asks for play
+    'player': dict(markup='<video-player><mux-video preload="none" playsinline crossorigin></mux-video></video-player>', imports="import '/embed/red-thread.js';",
+                   start="const m = document.querySelector('mux-video'); go.addEventListener('pointerdown', () => m.setAttribute('src', SRC)); go.addEventListener('click', () => note(document.querySelector('video-player').store.play()));"),
+}
+
+
+def raw_page(kind):
+    k = RAW_KINDS.get(kind)
+    if not k:
+        return None
+    return RAW % dict(kind=kind, markup=k['markup'], scripts=k.get('scripts', ''), imports=k.get('imports', ''), src=json.dumps(SRC), start=k['start'])
+
+
 def skin(media):
     template = open(os.path.join(ROOT, 'src/video/skin.html'), encoding='utf-8').read()
     return template.replace('<!-- Add a compatible media component here. -->', media)
@@ -144,6 +205,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         path, query = url.path, urllib.parse.parse_qs(url.query)
         if path == '/lab/chapters.vtt':
             return self.send(200, CHAPTERS, 'text/vtt; charset=utf-8')
+        if path.startswith('/lab/raw/'):
+            page = raw_page(path[9:])
+            return self.send(200, page, 'text/html; charset=utf-8') if page else self.send(404, 'no such raw page', 'text/plain')
+        if path == '/hlsjs/hls.min.js':
+            return self.send(200, open(os.path.join(ROOT, 'node_modules/hls.js/dist/hls.min.js'), 'rb').read(), 'text/javascript')
         if path.startswith('/lab/'):
             page = lab_page(path[5:], *[query.get(k, [None])[0] for k in ('engine', 'fix', 'on')])
             return self.send(200, page, 'text/html; charset=utf-8') if page else self.send(404, 'no such lab page', 'text/plain')

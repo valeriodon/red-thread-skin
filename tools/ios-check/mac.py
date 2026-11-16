@@ -52,6 +52,21 @@ for name, url, sel in PAGES:
     log('== %s: %s' % (name, url))
     try:
         d.get(url)
+        if '/lab/raw/' in url:  # no skin: one button, and the page reports the video itself
+            for _ in range(40):
+                time.sleep(0.5)
+                if d.execute_script('return !!window.__ready'):
+                    break
+            time.sleep(1.0)
+            ActionChains(d).click(d.find_element('css selector', '#go')).perform()
+            for wait, label in ((1.5, 'click +1.5s'), (3.0, 'click +4.5s'), (4.0, 'click +8.5s')):
+                time.sleep(wait)
+                s = d.execute_script('return window.__state()')
+                s['step'] = label
+                steps.append(s)
+                log('  [%s] %s: %s' % (name, label, json.dumps(s)))
+            playing = (s['paused'] is False) and (s['t'] or 0) > 1.0
+            raise StopIteration
         for _ in range(40):
             time.sleep(0.5)
             if d.execute_script("var p = document.querySelector('video-player'); return !!(p && p.store && document.querySelector('red-thread canvas'));"):
@@ -79,6 +94,8 @@ for name, url, sel in PAGES:
             time.sleep(2.5)
             state(name, sel, 'after a click on the thread at two thirds', steps)
             d.save_screenshot(os.path.join(OUT, name + '-4-seek.png'))
+    except StopIteration:
+        pass
     except Exception as e:
         log('  FAILED:', type(e).__name__, str(e)[:300])
     results[name] = {'url': url, 'playing': playing, 'steps': steps}
