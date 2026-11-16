@@ -118,7 +118,7 @@ npm run build
 
 ## Deploy
 
-The demo is on Vercel. `npm run deploy` publishes the workbench to Vercel, Netlify or Cloudflare Pages.
+The demo is on Vercel and follows this repository: a push to `main` publishes it. To put the workbench on a host of your own, `npm run deploy` publishes it to Vercel, Netlify or Cloudflare Pages.
 
 ## Credits
 
