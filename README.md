@@ -50,6 +50,20 @@ The skin is the four files in `src/video/`: `skin.html` (the markup), `skin.css`
 
    `apps/preview/src/frame/player.ts` is this same code, as the demo runs it.
 
+### Without a bundler
+
+`npm run build:embed` writes `dist-embed/`: `red-thread.js` (Video.js, the Mux media element and the skin in one module), `red-thread.css` and the language files Video.js loads on demand. Copy the folder to your site, then put the skin's markup inside a `<video-player>`:
+
+```html
+<link rel="stylesheet" href="/red-thread/red-thread.css" />
+<script type="module" src="/red-thread/red-thread.js"></script>
+
+<video-player poster="poster.jpg">
+  <!-- the contents of src/video/skin.html, with this in place of its comment: -->
+  <mux-video src="https://stream.mux.com/PLAYBACK_ID.m3u8" playsinline crossorigin></mux-video>
+</video-player>
+```
+
 What the thread shows comes from the media:
 
 | On the thread | Where it comes from |

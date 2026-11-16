@@ -298,8 +298,9 @@
   color: #11151b;
   font: 400 14px / 1.45 var(--rt-font);
   background: #fff;
+  /* The card hangs from a length of thread: a straight top edge, rounded below. */
   border-top: 3px solid var(--rt-thread);
-  border-radius: 8px;
+  border-radius: 0 0 8px 8px;
   translate: -50% -50%;
 }
 
