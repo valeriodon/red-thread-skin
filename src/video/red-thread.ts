@@ -110,6 +110,11 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   let pend: { x: number; y: number } | null = null;
   // How far the pointer may wander and still count as a tap; a finger wobbles more than a mouse.
   let slop = 5;
+  // A finger would hide the preview that hangs under it. For a touch the thread holds at `touchY`, above the
+  // finger, and `lift` is how far above; the mouse leaves both unset.
+  let touchY: number | null = null;
+  let lift = 0;
+  let barH = 52;
   let inZone = false;
   let pu = 0.5;
   let px = 0;
@@ -150,6 +155,9 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   const CORDX = () => W - PAD();
   const CORD = (level: number) => 26 + level * H * 0.28;
   const CORD_MUTED = 16;
+  const SIGNW = () => clamp(W * 0.13, 56, 120);
+  /** Where the thread holds while the preview hangs from it. */
+  const HOLD = () => Math.min(H * 0.68, H - ((SIGNW() * 9) / 16 + 58));
   const nowS = () => performance.now() / 1000;
 
   motionQuery.addEventListener(
@@ -176,6 +184,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       if (ready) render(fNow, 0);
     }
     if (!yb) yb = H * 0.6;
+    barH = topBar?.offsetHeight || barH;
   }
   const resizeObserver = new ResizeObserver(size);
   resizeObserver.observe(canvas);
@@ -239,6 +248,14 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       } else if (py > ZONE() && dur) {
         pend = { x: px, y: py };
         inZone = true;
+        if (e.pointerType === 'mouse') {
+          touchY = null;
+          lift = 0;
+        } else {
+          // The photo, its label and half a fingertip have to fit between the thread and the touch.
+          touchY = clamp(py - ((SIGNW() * 9) / 16 + 68), 28, HOLD());
+          lift = Math.max(0, py - touchY);
+        }
       } else tap = { x: px, y: py };
     },
     { signal }
@@ -301,7 +318,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     } else if (drag) {
       drag = false;
       seekTo(pu);
-      pluck(pu, clamp(py - yb, -46, 46));
+      pluck(pu, clamp(py - lift - yb, -46, 46));
       if (e.pointerType !== 'mouse') inZone = false;
     } else if (volDrag) {
       volDrag = false;
@@ -313,6 +330,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       togglePaused();
     }
     tap = null;
+    lift = 0;
   }
   canvas.addEventListener('pointerup', release, { signal });
   canvas.addEventListener('pointercancel', release, { signal });
@@ -581,7 +599,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       y -= 7 * Math.exp(-((u - c) * (u - c)) / 0.004);
     }
     const pmax = Math.min(46, H * 0.1);
-    const pull = drag ? clamp(py - yb, -pmax, pmax) : clamp((py - yb) * 0.22, -7, 7) * hov;
+    const pull = drag ? clamp(py - lift - yb, -pmax, pmax) : clamp((py - yb) * 0.22, -7, 7) * hov;
     if (pull) {
       const a = clamp(pu, 0.03, 0.97);
       y += u < a ? (pull * u) / a : (pull * (1 - u)) / (1 - a);
@@ -772,20 +790,26 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     if (!sprites.size && s.thumbnailsTrack?.cues?.length) spriteAt(s, 0);
     const TR = Math.min(W, H) * 0.15;
     const morphT = !playing && !active ? 1 : 0;
-    const signW = clamp(W * 0.13, 56, 120);
-    const ybT = active ? Math.min(H * 0.68, H - ((signW * 9) / 16 + 58)) : playing ? H * 0.9 : H * 0.46 + TR;
+    const signW = SIGNW();
+    if (!active) touchY = null;
+    const ybT = active ? (touchY ?? HOLD()) : playing ? H * 0.9 : H * 0.46 + TR;
+    // Held by a finger the thread is tight, so the photo hangs as high as it can.
+    const sagT = playing || touchY !== null ? 0 : 1;
     if (RM) {
-      sag = playing ? 0 : 1;
+      sag = sagT;
       morph = morphT;
       yb = ybT;
     } else {
-      [sag, sagV] = spring(sag, sagV, playing ? 0 : 1, 90, 9, dt);
+      [sag, sagV] = spring(sag, sagV, sagT, 90, 9, dt);
       [morph, morphV] = spring(morph, morphV, morphT, 130, 13, dt);
       [yb, ybV] = spring(yb, ybV, ybT, 150, 19, dt);
       intro = Math.min(1, intro + dt / 1.1);
     }
     hov += ((inZone && !drag && !pend && !glide ? 1 : 0) - hov) * Math.min(1, dt * 12);
-    const topT = !topBar || topBar.hasAttribute('data-visible') ? 1 : 0;
+    // On a small player the lifted thread reaches the top bar: the bar steps back until the finger lets go.
+    const crowded = touchY !== null && touchY < barH + 14;
+    container.toggleAttribute('data-rt-lifted', crowded);
+    const topT = (!topBar || topBar.hasAttribute('data-visible')) && !crowded ? 1 : 0;
     topA = RM ? topT : topA + (topT - topA) * Math.min(1, dt * 10);
 
     volumeFixed = s.volumeAvailability === 'unsupported';

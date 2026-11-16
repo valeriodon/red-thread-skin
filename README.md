@@ -87,6 +87,7 @@ Every control is a real Video.js element under the drawing, so Tab reaches capti
 
 - The caption and fullscreen buttons are 44 px targets on touch screens; the cord and the thread take a finger anywhere near them.
 - Tap the cord's knob to mute, pull it to set the volume. On an iPhone, where the browser leaves loudness to the hardware buttons, the cord is the mute switch: down for sound, up for silence.
+- Under a finger the thread rises above it and goes tight, so the preview hangs in view instead of under the hand. On a small player the time and the icons step back while it does.
 - A finger on the picture scrolls the page, unless it starts on the thread or on the cord.
 - A tap on the picture never lands on a button that is not showing.
 
@@ -124,7 +125,7 @@ The demo is on Vercel and follows this repository: a push to `main` publishes it
 
 - Made by [Valerio Donfrancesco](https://valeriodonfrancesco.pro) for the Video.js Skins Design Challenge by Contra and Mux.
 - Built on [Video.js 10](https://videojs.org) and started from `videojs skin create` (see `skin.json`).
-- The demo video is the official trailer of [Cosmic Dawn: The Untold Story of the James Webb Space Telescope](https://plus.nasa.gov/video/cosmic-dawn-the-untold-story-of-the-james-webb-space-telescope/), a NASA+ documentary, streamed from Mux as the sample video of the Video.js skin workbench. Courtesy of NASA, which does not endorse this project. The video is not part of this repository.
+- The demo video is the official trailer of [Cosmic Dawn: The Untold Story of the James Webb Space Telescope](https://plus.nasa.gov/video/cosmic-dawn-the-untold-story-of-the-james-webb-space-telescope/), a NASA+ documentary, streamed from Mux as the sample video of the Video.js skin workbench. Credit: NASA's Goddard Space Flight Center, which does not endorse this project. The video is not part of this repository.
 
 ## License
 

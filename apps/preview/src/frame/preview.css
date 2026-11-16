@@ -21,6 +21,18 @@ body {
   max-width: var(--preview-player-width, 56rem);
 }
 
+/* On a phone held sideways the player is as wide as its height allows, so all of it stays in view. */
+@media (orientation: landscape) and (max-height: 540px) {
+  .preview-page {
+    min-height: 100svh;
+    padding: 12px;
+  }
+
+  .preview-player:not([style*="ratio: auto"]) {
+    max-width: min(var(--preview-player-width, 56rem), calc((100svh - 24px) * (var(--preview-player-ratio, 16 / 9))));
+  }
+}
+
 /* The aspect ratio option overrides the skin's own; `auto` lets the media's intrinsic size decide. */
 .preview-player[style*="--preview-player-ratio"] .media-skin {
   aspect-ratio: var(--preview-player-ratio);

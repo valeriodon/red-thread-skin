@@ -116,6 +116,11 @@
   opacity: 0;
 }
 
+/* A finger has lifted the thread into the top bar: the bar steps back until it lets go. */
+.rt-skin[data-rt-lifted] .rt-top {
+  opacity: 0;
+}
+
 .rt-time {
   font: 500 12.5px / 1 var(--rt-mono);
   font-variant-numeric: tabular-nums;
