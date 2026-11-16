@@ -146,7 +146,18 @@ o.set_capability('appium:wdaLaunchTimeout', 900000)
 o.set_capability('appium:wdaConnectionTimeout', 900000)
 o.set_capability('appium:newCommandTimeout', 900)
 o.set_capability('appium:safariInitialUrl', 'about:blank')
-d = webdriver.Remote('http://127.0.0.1:4723', options=o)
+o.set_capability('appium:webviewConnectTimeout', 120000)
+o.set_capability('appium:webviewConnectRetries', 20)
+d = None
+for attempt in range(3):  # Safari's web inspector is sometimes not up yet on a fresh simulator
+    try:
+        d = webdriver.Remote('http://127.0.0.1:4723', options=o)
+        break
+    except Exception as e:
+        log('session attempt %d failed: %s' % (attempt + 1, str(e)[:200]))
+        time.sleep(20)
+if d is None:
+    sys.exit('no Safari session')
 d.set_script_timeout(30)
 d.set_page_load_timeout(90)
 W, H = d.execute_script('return [screen.width, screen.height]')
