@@ -3,8 +3,10 @@
 
 For each page: tap the picture and report whether the film plays; with the mode "full" also the tap that only
 brings the controls back, captions and fullscreen.
+A page that holds the player in a frame (the demo's home page) is followed into the frame.
 Usage: check.py <simulator udid> <output dir> [name@@url@@selector-of-the-player[@@mode] ...]
-Modes: play (default) or full. Pages on 127.0.0.1 are served by lab.py.
+Modes: play (default) or full, each also with the phone turned on its side: play-landscape, full-landscape.
+Pages on 127.0.0.1 are served by lab.py.
 Writes results.json and screenshots to the output dir, and prints a summary.
 """
 import json, os, subprocess, sys, time
@@ -75,7 +77,11 @@ def shot(name):
 
 class Page:
     def __init__(self, name, url, sel, mode):
-        self.name, self.url, self.sel, self.mode, self.cal = name, url, sel, mode, None
+        self.name, self.url, self.sel, self.cal = name, url, sel, None
+        self.landscape = mode.endswith('-landscape')
+        self.mode = mode[:-len('-landscape')] if self.landscape else mode
+        self.screen = (max(W, H), min(W, H)) if self.landscape else (W, H)
+        self.off = (0, 0)  # where the player's frame sits in the page, when there is one
         self.playing = False
         self.steps = []
 
@@ -83,8 +89,8 @@ class Page:
         s = d.execute_script(STATE, self.sel)
         s['step'] = label
         self.steps.append(s)
-        log('  [%s] %s: paused=%s t=%s waiting=%s bar=%s subtitles=%s fullscreen=%s skin=%s view=%sx%s caption=%s err=%s trackEls=%s inner=%s hls=%s events=%s errors=%s' % (
-            self.name, label, s['paused'], s['t'], s['waiting'], s['topVisible'], s['subtitles'], s['isFullscreen'], s['skin'], s['view']['iw'], s['view']['ih'],
+        log('  [%s] %s: paused=%s t=%s waiting=%s bar=%s subtitles=%s fullscreen=%s native=%s skin=%s view=%sx%s share=%s caption=%s err=%s trackEls=%s inner=%s hls=%s events=%s errors=%s' % (
+            self.name, label, s['paused'], s['t'], s['waiting'], s['topVisible'], s['subtitles'], s['isFullscreen'], s['inner'] and s['inner']['mode'], s['skin'], s['view']['iw'], s['view']['ih'], json.dumps(s['window']),
             json.dumps(s['caption']), s['error'], json.dumps(s['trackEls']), json.dumps(s['inner']), json.dumps(s['hls']), s['events'], s['errors']))
         return s
 
@@ -92,7 +98,7 @@ class Page:
         for attempt in range(4):
             d.execute_script(CAL_START)
             time.sleep(0.6 + attempt)
-            sx, sy = W / 2, H * (0.45 + 0.05 * attempt)
+            sx, sy = self.screen[0] / 2, self.screen[1] * (0.45 + 0.05 * attempt)
             d.execute_script('mobile: tap', {'x': float(sx), 'y': float(sy)})
             time.sleep(0.8)
             c = d.execute_script(CAL_READ)
@@ -104,23 +110,46 @@ class Page:
 
     def tap(self, x, y):
         """A real touch at page (client) coordinates."""
-        d.execute_script('mobile: tap', {'x': float(self.cal[0] + x), 'y': float(self.cal[1] + y)})
+        d.execute_script('mobile: tap', {'x': float(self.cal[0] + self.off[0] + x), 'y': float(self.cal[1] + self.off[1] + y)})
 
     def tap_picture(self, s):
         b = s['skin']
         self.tap(b[0] + b[2] / 2, b[1] + b[3] * 0.35)
 
     def run(self):
-        log('== %s: %s' % (self.name, self.url))
+        log('== %s: %s%s' % (self.name, self.url, ' (landscape)' if self.landscape else ''))
+        try:
+            d.orientation = 'LANDSCAPE' if self.landscape else 'PORTRAIT'
+            time.sleep(2.0)
+        except Exception as e:
+            log('  could not turn the phone:', type(e).__name__, str(e)[:200])
         d.get(self.url)
+        ready = "var p = document.querySelector('video-player'); return !!(p && p.store && document.querySelector('red-thread canvas'));"
+        framed = False
         for _ in range(40):
             time.sleep(0.5)
-            if d.execute_script("var p = document.querySelector('video-player'); return !!(p && p.store && document.querySelector('red-thread canvas'));"):
+            if d.execute_script(ready):
                 break
+            if d.execute_script("return !document.querySelector('video-player') && !!document.querySelector('iframe');"):
+                framed = True
+                break
+        if framed:
+            # the player is in a frame: touches are placed from the page, everything else is read inside the frame
+            time.sleep(2.0)
+            self.calibrate()
+            frame = d.find_element('css selector', 'iframe')
+            self.off = tuple(d.execute_script('var r = arguments[0].getBoundingClientRect(); return [r.left, r.top];', frame))
+            log('  [%s] frame at %s' % (self.name, self.off))
+            d.switch_to.frame(frame)
+            for _ in range(40):
+                time.sleep(0.5)
+                if d.execute_script(ready):
+                    break
         d.execute_script("document.querySelector(arguments[0]).scrollIntoView({ block: 'center' }); return true;", self.sel)
         time.sleep(1.5)
         d.execute_script(HOOKS)
-        self.calibrate()
+        if not framed:
+            self.calibrate()
         s = self.state('loaded')
         shot(self.name + '-1-loaded')
 
@@ -191,6 +220,10 @@ for name, url, sel, mode in PAGES:
     except Exception as e:
         log('  FAILED:', type(e).__name__, str(e)[:300])
         shot(name + '-error')
+    try:
+        d.switch_to.default_content()
+    except Exception:
+        pass
     results[name] = {'url': url, 'playing': page.playing, 'steps': page.steps}
     if not page.playing:
         code = 1
