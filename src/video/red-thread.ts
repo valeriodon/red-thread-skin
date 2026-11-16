@@ -48,6 +48,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   const sliderEl = find('.rt-time-slider');
   const focused = (el: HTMLElement | null) => !!el && el.matches(':focus-visible, :has(:focus-visible)');
   let RED = '#ff4530';
+  let MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
 
   const getStore = (): Store | null => {
     // biome-ignore lint/suspicious/noExplicitAny: walking up to whichever player element provides the store
@@ -174,7 +175,9 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     W = r.width;
     H = r.height;
-    RED = getComputedStyle(container).getPropertyValue('--rt-thread').trim() || RED;
+    const style = getComputedStyle(container);
+    RED = style.getPropertyValue('--rt-thread').trim() || RED;
+    MONO = style.getPropertyValue('--rt-mono').trim() || MONO;
     const cw = Math.round(W * dpr);
     const ch = Math.round(H * dpr);
     if (canvas.width !== cw || canvas.height !== ch) {
@@ -1010,7 +1013,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
         sx.fillRect(dx - tw / 2 - 2, 7, tw + 4, th + 4);
         sx.drawImage(sprite.img, sprite.x, sprite.y, sprite.w, sprite.h, dx - tw / 2, 9, tw, th);
       }
-      sx.font = '500 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+      sx.font = `500 11px ${MONO}`;
       sx.textAlign = 'center';
       sx.textBaseline = 'top';
       const maxW = W * 0.6;
@@ -1058,7 +1061,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     // The cord's label goes over the icons: with the cord short, on a small player, it reaches them.
     if (volHover || volDrag) {
       const text = muted ? 'MUTE' : volumeFixed ? 'SOUND' : `VOL ${Math.round(volume * 100)}`;
-      sx.font = '500 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+      sx.font = `500 11px ${MONO}`;
       sx.textAlign = 'right';
       sx.textBaseline = 'middle';
       const lw = sx.measureText(text).width;

@@ -72,13 +72,14 @@ What the thread shows comes from the media:
 | The hanging preview | a `<track kind="metadata" label="thumbnails">` storyboard; `<mux-video>` adds its own |
 | Caption lines | the media's caption or subtitle tracks |
 
-Three custom properties restyle it:
+Four custom properties restyle it:
 
 ```css
 video-player {
   --media-accent-color: #ff4530; /* the thread */
   --media-border-radius: 14px;
   --media-font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  --media-mono-font-family: 'IBM Plex Mono', ui-monospace, monospace; /* the time, and the labels on the thread */
 }
 ```
 
@@ -117,7 +118,7 @@ With `prefers-reduced-motion: reduce` nothing springs, swings or stretches: the 
 
 `src/video/red-thread.ts` defines `<red-thread>`, one canvas over the picture. Every frame it reads the player store (`currentTime`, `duration`, `paused`, `buffered`, `waiting`, `volume`, `muted`, `chaptersCues`, `thumbnailsTrack`, `subtitlesShowing`, `isFullscreen`) and draws the thread; pointer gestures call the store's actions (`play`, `pause`, `seek`, `setVolume`, `setMuted`, `requestFullscreen`). It has no dependencies beyond `@videojs/html`.
 
-`src/video/skin.css` styles the real controls and exposes `--media-accent-color`, `--media-border-radius` and `--media-font-family`.
+`src/video/skin.css` styles the real controls and exposes `--media-accent-color`, `--media-border-radius`, `--media-font-family` and `--media-mono-font-family`.
 
 ## Develop
 

@@ -10,7 +10,7 @@
   --rt-shade: rgb(8 10 16 / 0.55);
   --rt-radius: var(--media-border-radius, 14px);
   --rt-font: var(--media-font-family, 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif);
-  --rt-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --rt-mono: var(--media-mono-font-family, 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace);
 
   position: relative;
   display: block;
