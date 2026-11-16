@@ -34,8 +34,9 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   canvas.setAttribute('aria-hidden', 'true');
   host.replaceChildren(canvas);
   const sx = canvas.getContext('2d') as CanvasRenderingContext2D;
-  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const find = <T extends HTMLElement>(selector: string) => container.querySelector<T>(selector);
+  const motionQuery = matchMedia('(prefers-reduced-motion: reduce)');
+  let RM = motionQuery.matches;
+  const find =<T extends HTMLElement>(selector: string) => container.querySelector<T>(selector);
   const ccBtn = find('.rt-captions-button');
   const fsBtn = find('.rt-fullscreen-button');
   const chapterEl = find('.rt-chapter');
@@ -107,6 +108,8 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   let volHover = false;
   let tap: { x: number; y: number } | null = null;
   let pend: { x: number; y: number } | null = null;
+  // How far the pointer may wander and still count as a tap; a finger wobbles more than a mouse.
+  let slop = 5;
   let inZone = false;
   let pu = 0.5;
   let px = 0;
@@ -132,6 +135,8 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   let cordLen = 0;
   let cordAng = 0;
   let cordV = 0;
+  // Where the browser leaves loudness to the hardware buttons (iPhone), the cord is the mute switch.
+  let volumeFixed = false;
   // icons
   const ico = {
     cc: { h: 0, c: 0, v: 0, at: -9, a: 0, on: false },
@@ -143,7 +148,18 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   const PAD = () => clamp(W * 0.04, 18, 40);
   const ZONE = () => H * 0.58;
   const CORDX = () => W - PAD();
+  const CORD = (level: number) => 26 + level * H * 0.28;
+  const CORD_MUTED = 16;
   const nowS = () => performance.now() / 1000;
+
+  motionQuery.addEventListener(
+    'change',
+    () => {
+      RM = motionQuery.matches;
+      if (RM) intro = 1;
+    },
+    { signal }
+  );
 
   function size() {
     const r = canvas.getBoundingClientRect();
@@ -209,6 +225,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     (e) => {
       if (e.button) return;
       point(e);
+      slop = e.pointerType === 'mouse' ? 5 : 10;
       try {
         canvas.setPointerCapture(e.pointerId);
       } catch {
@@ -236,7 +253,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
         inZone = py > ZONE();
         volHover = onCord();
       }
-      if (pend && Math.hypot(px - pend.x, py - pend.y) > 5) {
+      if (pend && Math.hypot(px - pend.x, py - pend.y) > slop) {
         pend = null;
         drag = true;
         glide = null;
@@ -245,11 +262,17 @@ function mount(host: HTMLElement, signal: AbortSignal) {
         lastSeekAt = nowS();
         seekTo(pu);
       }
-      if (tap && Math.hypot(px - tap.x, py - tap.y) > 5) tap = null;
+      if (tap && Math.hypot(px - tap.x, py - tap.y) > slop) tap = null;
       if (volDrag && !tap && s) {
-        if (s.muted) s.setMuted?.(false);
-        s.setVolume?.(clamp((py - 26) / (H * 0.28), 0, 1));
-        cordV += (e.movementX || 0) * 0.03;
+        if (volumeFixed) {
+          // Pull down for sound, push up for silence.
+          const mute = py < (CORD_MUTED + CORD(0.6)) / 2;
+          if (mute !== !!s.muted) s.setMuted?.(mute);
+        } else {
+          if (s.muted) s.setMuted?.(false);
+          s.setVolume?.(clamp((py - 26) / (H * 0.28), 0, 1));
+        }
+        if (!RM) cordV += (e.movementX || 0) * 0.03;
       }
     },
     { signal }
@@ -284,7 +307,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       volDrag = false;
       if (tap && s) {
         s.setMuted?.(!s.muted);
-        cordV += 3;
+        if (!RM) cordV += 3;
       }
     } else if (tap && e.type === 'pointerup') {
       togglePaused();
@@ -313,6 +336,15 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       const s = getStore();
       const filling = fsm.phase !== 'idle' || s?.isFullscreen;
       if (filling || y > ZONE() || (Math.abs(x - CORDX()) < 24 && y < cordLen + 28)) e.preventDefault();
+    },
+    { passive: false, signal }
+  );
+  // The pointer handlers above already acted on the touch. Without this the browser's follow-up click
+  // could land on a button that the same tap has just made visible.
+  canvas.addEventListener(
+    'touchend',
+    (e) => {
+      if (e.cancelable) e.preventDefault();
     },
     { passive: false, signal }
   );
@@ -753,13 +785,21 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       intro = Math.min(1, intro + dt / 1.1);
     }
     hov += ((inZone && !drag && !pend && !glide ? 1 : 0) - hov) * Math.min(1, dt * 12);
-    topA += ((!topBar || topBar.hasAttribute('data-visible') ? 1 : 0) - topA) * Math.min(1, dt * 10);
+    const topT = !topBar || topBar.hasAttribute('data-visible') ? 1 : 0;
+    topA = RM ? topT : topA + (topT - topA) * Math.min(1, dt * 10);
 
-    const volumeFixed = s.volumeAvailability === 'unsupported';
-    const cordT = muted ? 16 : 26 + (volumeFixed ? 0.6 : volume) * H * 0.28;
-    cordLen = cordLen ? cordLen + (cordT - cordLen) * Math.min(1, dt * 10) : cordT;
-    [cordAng, cordV] = spring(cordAng, cordV, 0, 60, 4, dt);
-    cordAng = clamp(cordAng, -0.7, 0.7);
+    volumeFixed = s.volumeAvailability === 'unsupported';
+    const cordT = muted ? CORD_MUTED : CORD(volumeFixed ? 0.6 : volume);
+    if (RM) {
+      // The cord takes its length at once and hangs still.
+      cordLen = cordT;
+      cordAng = 0;
+      cordV = 0;
+    } else {
+      cordLen = cordLen ? cordLen + (cordT - cordLen) * Math.min(1, dt * 10) : cordT;
+      [cordAng, cordV] = spring(cordAng, cordV, 0, 60, 4, dt);
+      cordAng = clamp(cordAng, -0.7, 0.7);
+    }
 
     if (glide) {
       const k = clamp((now - glide.t0) / 0.32, 0, 1);
@@ -780,8 +820,13 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     [pop, popV] = spring(pop, popV, 0, 260, 14, dt);
     const vel = dt > 0 ? (su - lastSu) / dt : 0;
     lastSu = su;
-    swingV += (-70 * swing - 7 * swingV - (active ? clamp(vel, -3, 3) * 16 : 0)) * dt;
-    swing = clamp(swing + swingV * dt, -0.45, 0.45);
+    if (RM) {
+      swing = 0;
+      swingV = 0;
+    } else {
+      swingV += (-70 * swing - 7 * swingV - (active ? clamp(vel, -3, 3) * 16 : 0)) * dt;
+      swing = clamp(swing + swingV * dt, -0.45, 0.45);
+    }
 
     const p = dur ? clamp(disp / dur, 0, 1) : 0;
     const chapters: [number, string][] = dur
@@ -889,6 +934,14 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       sx.arc(b[0], b[1], 1.6 + bold * 0.6, 0, 7);
       sx.fillStyle = '#fff';
       sx.fill();
+      // With reduced motion no bump runs along the thread, so a still ring around the bead says it is buffering.
+      if (waiting && RM) {
+        sx.beginPath();
+        sx.arc(b[0], b[1], 10, 0, 7);
+        sx.strokeStyle = '#fff';
+        sx.lineWidth = 1.5;
+        sx.stroke();
+      }
     }
 
     // ── the preview, hanging from the thread like a photo on a clothesline ──
@@ -961,27 +1014,28 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     sx.fillStyle = muted ? '#11151b' : '#fff';
     sx.fill();
     sx.globalAlpha = 1;
+
+    drawIcons(now, dt, s);
+
+    // The cord's label goes over the icons: with the cord short, on a small player, it reaches them.
     if (volHover || volDrag) {
-      const text = muted ? 'MUTE' : `VOL ${Math.round(volume * 100)}`;
+      const text = muted ? 'MUTE' : volumeFixed ? 'SOUND' : `VOL ${Math.round(volume * 100)}`;
       sx.font = '500 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
       sx.textAlign = 'right';
       sx.textBaseline = 'middle';
       const lw = sx.measureText(text).width;
-      sx.fillStyle = 'rgba(8,10,16,.7)';
+      sx.fillStyle = 'rgba(8,10,16,.92)';
       sx.fillRect(ex - 16 - lw - 5, ey - 9, lw + 10, 18);
       sx.fillStyle = '#fff';
       sx.fillText(text, ex - 16, ey);
     }
     sx.textAlign = 'left';
 
-    drawIcons(now, dt, s);
-
     // The real mute button rides on the cord's knob, and the real slider lies along the thread,
     // so their focus rings frame what the canvas draws.
     if (muteBtn) {
-      muteBtn.style.top = `${Math.round(ey - 18)}px`;
-      muteBtn.style.left = `${Math.round(ex - 18)}px`;
-      muteBtn.style.right = 'auto';
+      muteBtn.style.top = `${Math.round(ey)}px`;
+      muteBtn.style.left = `${Math.round(ex)}px`;
     }
     if (sliderEl) {
       sliderEl.style.top = `${Math.round(yb - 24)}px`;

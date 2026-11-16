@@ -162,11 +162,17 @@
   display: none;
 }
 
-/* The mute button sits on the pull cord's anchor, top right. */
+/* The mute button rides on the pull cord's knob, top right; the canvas moves it there, whatever its size. */
 .rt-mute-button {
   position: absolute;
   top: 0;
-  right: calc(clamp(18px, 4cqw, 40px) - 18px);
+  left: calc(100% - clamp(18px, 4cqw, 40px));
+  pointer-events: none;
+  translate: -50% -50%;
+}
+
+/* Hidden controls take no taps: on a touch screen the tap reaches the picture instead of an unseen button. */
+.rt-top:not([data-visible]) .rt-button {
   pointer-events: none;
 }
 
@@ -179,6 +185,11 @@
 
   .rt-top {
     gap: 6px;
+  }
+
+  .rt-dialog-close {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 
@@ -222,7 +233,8 @@
 
 .rt-captions {
   position: absolute;
-  top: 15%;
+  /* Below the time and the icons, also on a player as small as a phone's. */
+  top: max(15%, 58px);
   left: 50%;
   z-index: 3;
   max-width: 74%;
@@ -315,13 +327,22 @@
   white-space: nowrap;
 }
 
-@media (max-width: 480px) {
+/* A narrow player, on a phone or in a small embed. */
+@container (max-width: 480px) {
   .rt-chapter {
     display: none;
   }
 
   .rt-top {
     gap: 4px;
+  }
+
+  /* Lines may run the width of the picture, short of the pull cord. */
+  .rt-captions {
+    right: 8%;
+    left: 8%;
+    max-width: none;
+    translate: none;
   }
 }
 
