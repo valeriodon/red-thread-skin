@@ -6,7 +6,7 @@
                      the video host until the visitor reaches for the player)
     /lab/js          the same, but the player is made by a script once the module has loaded
                      (late and js take ?engine=native, startpos or pad0: see ENGINES; late also takes
-                     ?fix=defer, reseek or pauseplay, and ?on=up: see FIXES)
+                     ?fix=defer, defer-up, reseek or pauseplay: see FIXES)
     /embed/...       dist-embed/
     anything else    fetched from UPSTREAM, so a live page can be checked with one thing changed: add ?v=static
                      (address in the markup), ?v=static,nocase or ?v=static,nocss to its address
@@ -84,6 +84,8 @@ def skin(media):
 
 
 def lab_page(name, engine=None, fix=None, on=None):
+    if fix and fix.endswith('-up'):  # a single parameter, so the address needs no quoting in a shell
+        fix, on = fix[:-3], 'up'
     source = 'media.source = %s;' % ENGINES[engine] if engine in ENGINES else ''
     source += FIXES.get(fix, '')
     # which events hand the address over: by default the earliest ones, with ?on=up only a finished gesture
