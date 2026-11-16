@@ -396,12 +396,13 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   let savedStyle = '';
   let wasFullscreen = false;
   // An iPhone has no fullscreen for a page's own elements, only Apple's player for the bare video. There the
-  // stretch ends with the skin filling the window and nothing is handed over. Inside a frame the window is
-  // only the frame, so there the handover stays.
+  // stretch ends with the skin filling the window and nothing is handed over. A frame that is most of the
+  // screen (a demo page around the player) is as good as the window; in a small embed the handover stays.
   const fillsWindow = () => {
     // biome-ignore lint/suspicious/noExplicitAny: prefixed fullscreen flag
     const doc = document as any;
-    return !(doc.fullscreenEnabled || doc.webkitFullscreenEnabled) && window.self === window.top;
+    if (doc.fullscreenEnabled || doc.webkitFullscreenEnabled) return false;
+    return window.self === window.top || window.innerWidth * window.innerHeight >= 0.55 * screen.width * screen.height;
   };
 
   function stretchStart() {

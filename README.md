@@ -90,7 +90,7 @@ Every control is a real Video.js element under the drawing, so Tab reaches capti
 - Under a finger the thread rises above it and goes tight, so the preview hangs in view instead of under the hand. On a small player the time and the icons step back while it does.
 - A finger on the picture scrolls the page, unless it starts on the thread or on the cord.
 - A tap on the picture never lands on a button that is not showing.
-- An iPhone has no fullscreen for a page's own controls, only Apple's player for the bare video. There the four threads pull the player open to fill the window and the skin stays; turn the phone and it fills the screen. Inside a frame the handover to Apple's player remains.
+- An iPhone has no fullscreen for a page's own controls, only Apple's player for the bare video. There the four threads pull the player open to fill the window and the skin stays; turn the phone and it fills the screen. Only in a small embedded frame does the handover to Apple's player remain.
 - On a player as small as a phone's, caption lines sit under the time and the icons and move up into their place when those are away.
 
 ### Reduced motion
