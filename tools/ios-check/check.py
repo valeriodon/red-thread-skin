@@ -106,7 +106,7 @@ return {
   srcAttr: m && m.getAttribute('src') ? 'set' : 'none',
   inner: inner ? { src: String(inner.currentSrc || inner.src || '').slice(0, 12), readyState: inner.readyState, networkState: inner.networkState, paused: inner.paused, err: inner.error ? inner.error.code : null, sources: [].map.call(inner.querySelectorAll('source'), function (q) { return (q.type || '?') + ' ' + String(q.src).slice(0, 5); }), mode: inner.webkitPresentationMode || null,
     buffered: spans(inner.buffered), preload: inner.preload, noRemote: inner.disableRemotePlayback, size: [inner.videoWidth, inner.videoHeight], seeking: inner.seeking,
-    decoded: [inner.webkitVideoDecodedByteCount, inner.webkitAudioDecodedByteCount], tracks: [].map.call(inner.textTracks, function (t) { return t.kind + ':' + t.mode; }) } : null,
+    decoded: [inner.webkitVideoDecodedByteCount, inner.webkitAudioDecodedByteCount], tracks: [].map.call(inner.textTracks, function (t) { return t.kind + ':' + t.mode + (t.mode === 'showing' && t.activeCues && t.activeCues.length ? ':"' + String(t.activeCues[0].text).slice(0, 30) + '"' : ''); }) } : null,
   hls: hls, preloadHost: m ? m.getAttribute('preload') : null, visible: document.visibilityState,
   mse: 'MediaSource' in window, mms: 'ManagedMediaSource' in window, fullscreenEnabled: !!(document.fullscreenEnabled || document.webkitFullscreenEnabled), isFullscreen: s ? s.isFullscreen : null,
   volumeAvailability: s ? s.volumeAvailability : null, subtitles: s ? s.subtitlesShowing : null, topVisible: !!document.querySelector('.rt-top[data-visible]'),
@@ -241,44 +241,47 @@ class Page:
 
         # 2. with the bar away, a tap only brings it back: the film keeps playing
         try:
-            if s['topVisible']:
-                time.sleep(2.5)
-                s = self.state('bar should be away')
+            for _ in range(8):
+                if not s['topVisible']:
+                    break
+                time.sleep(1.0)
+                s = self.state('waiting for the bar to go')
             self.tap_picture(s)
-            time.sleep(0.8)
-            s = self.state('tap with the bar away (expected: playing, bar back)')
-            # 3. captions
-            if s['cc']:
-                self.tap(s['cc'][0], s['cc'][1])
-                time.sleep(0.8)
-            d.execute_script("document.querySelector('video-player').store.seek(28.3); return true;")
-            time.sleep(1.6)
-            s = self.state('captions, bar showing')
-            shot(self.name + '-3-captions-bar')
-            time.sleep(3.0)
-            s = self.state('captions, bar away')
-            shot(self.name + '-4-captions-top')
+            time.sleep(0.5)
+            s = self.state('tap with the bar away (expected: still playing)')
+        except Exception as e:
+            log('  reveal step failed:', type(e).__name__, str(e)[:200])
+
+        # 3. captions, switched on through the real button's click handler (a touch on it is checked in the lab)
+        try:
+            d.execute_script("document.querySelector('.rt-captions-button').click(); document.querySelector('video-player').store.seek(28.3); return true;")
+            time.sleep(2.5)
+            s = self.state('captions on')
+            shot(self.name + '-3-captions')
+            time.sleep(2.5)
+            s = self.state('captions on, bar away')
+            shot(self.name + '-4-captions-bar-away')
         except Exception as e:
             log('  captions step failed:', type(e).__name__, str(e)[:200])
 
-        # 4. fullscreen: the skin should fill the window, with no handover to the native player, and keep playing
+        # 4. fullscreen, paused so the bar stays: the skin should fill the window with no handover to Apple's player
         try:
-            self.tap_picture(s)
-            time.sleep(0.8)
-            s = self.state('bar back for fullscreen')
+            d.execute_script("document.querySelector('video-player').store.pause(); return true;")
+            time.sleep(1.2)
+            s = self.state('paused for fullscreen')
             if s['fs']:
                 self.tap(s['fs'][0], s['fs'][1])
                 time.sleep(3.5)
-                s = self.state('after fullscreen tap (expected: playing, skin = window)')
+                s = self.state('after fullscreen tap (expected: skin = window)')
                 shot(self.name + '-5-fullscreen')
-                self.tap_picture(s)
-                time.sleep(0.8)
-                s = self.state('bar back in fullscreen')
                 if s['fs']:
                     self.tap(s['fs'][0], s['fs'][1])
                     time.sleep(3.5)
-                    self.state('after second fullscreen tap (expected: playing, skin back)')
+                    self.state('after second fullscreen tap (expected: skin back)')
                     shot(self.name + '-6-back')
+            d.execute_script("document.querySelector('video-player').store.play(); return true;")
+            time.sleep(2.0)
+            self.state('playing again')
         except Exception as e:
             log('  fullscreen step failed:', type(e).__name__, str(e)[:200])
 

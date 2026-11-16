@@ -5,6 +5,7 @@
     /lab/late        the same, but the address is handed over at the first gesture (as a page that asks nothing of
                      the video host until the visitor reaches for the player)
     /lab/js          the same, but the player is made by a script once the module has loaded
+                     (late and js take ?engine=native, startpos or pad0: see ENGINES)
     /embed/...       dist-embed/
     anything else    fetched from UPSTREAM, so a live page can be checked with one thing changed: add ?v=static
                      (address in the markup), ?v=static,nocase or ?v=static,nocss to its address
@@ -28,12 +29,21 @@ HEAD = '''<!doctype html>
 <style>body { margin: 0; background: #14110f; color: #eee; font: 16px system-ui; } main { padding: 120px 16px 900px; }</style>
 <main><p>%s</p><div id="stage">'''
 
+ENGINES = {
+    'native': "{ preferPlayback: 'native' }",
+    'startpos': "{ engine: { hlsJs: { startPosition: 0.05 } } }",
+    'pad0': "{ engine: { hlsJs: { skipBufferHolePadding: 0 } } }",
+}
+
 ARM = '''<script>
   // The address reaches the media element at the first gesture on the player, and no earlier.
   var stage = document.getElementById('stage');
   function arm() {
     var media = stage.querySelector('mux-video');
-    if (media && !media.getAttribute('src') && media.dataset.src) media.setAttribute('src', media.dataset.src);
+    if (media && !media.getAttribute('src') && media.dataset.src) {
+      %s
+      media.setAttribute('src', media.dataset.src);
+    }
   }
   ['pointerdown', 'touchstart', 'keydown', 'focusin'].forEach(function (type) { stage.addEventListener(type, arm, { capture: true, passive: true }); });
 </script>'''
@@ -44,7 +54,8 @@ def skin(media):
     return template.replace('<!-- Add a compatible media component here. -->', media)
 
 
-def lab_page(name):
+def lab_page(name, engine=None):
+    source = 'media.source = %s;' % ENGINES[engine] if engine in ENGINES else ''
     track = '<track kind="chapters" label="English" srclang="en" src="/lab/chapters.vtt" default>'
     module = '<script type="module" src="/embed/red-thread.js"></script>'
     if name == 'static':
@@ -52,16 +63,19 @@ def lab_page(name):
         return HEAD % (name, 'Address in the markup.') + '<video-player>' + skin(media) + '</video-player></div></main>' + module
     if name == 'late':
         media = '<mux-video data-src="%s" preload="none" playsinline crossorigin>%s</mux-video>' % (SRC, track)
-        return HEAD % (name, 'Address at the first gesture.') + '<video-player>' + skin(media) + '</video-player></div></main>' + module + ARM
+        return HEAD % (name, 'Address at the first gesture.') + '<video-player>' + skin(media) + '</video-player></div></main>' + module + ARM % source
     if name == 'js':
-        media = '<mux-video src="%s" playsinline crossorigin>%s</mux-video>' % (SRC, track)
+        media = '<mux-video playsinline crossorigin>%s</mux-video>' % track
         script = '''<script type="module">
   import '/embed/red-thread.js';
   const player = document.createElement('video-player');
   player.innerHTML = %s;
   document.getElementById('stage').append(player);
-  document.querySelector('mux-video').preload = 'metadata';
-</script>''' % json.dumps(skin(media)).replace('</', '<\\/')
+  const media = document.querySelector('mux-video');
+  %s
+  media.preload = 'metadata';
+  media.src = %s;
+</script>''' % (json.dumps(skin(media)).replace('</', '<\\/'), source, json.dumps(SRC))
         return HEAD % (name, 'Player made by a script.') + '</div></main>' + script
     return None
 
@@ -97,7 +111,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/lab/chapters.vtt':
             return self.send(200, CHAPTERS, 'text/vtt; charset=utf-8')
         if path.startswith('/lab/'):
-            page = lab_page(path[5:])
+            page = lab_page(path[5:], query.get('engine', [None])[0])
             return self.send(200, page, 'text/html; charset=utf-8') if page else self.send(404, 'no such lab page', 'text/plain')
         if path.startswith('/embed/'):
             file = os.path.normpath(os.path.join(ROOT, 'dist-embed', path[7:]))
