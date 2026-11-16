@@ -1,0 +1,15 @@
+Red Thread, a Video.js 10 skin
+Copyright 2026 Valerio Donfrancesco
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This project was started with `videojs skin create` and builds on Video.js
+(https://videojs.org), Copyright 2025-present Video.js contributors, licensed
+under the Apache License, Version 2.0. "Video.js" is a registered trademark of
+Brightcove Inc.
+
+The demo plays the official trailer of "Cosmic Dawn: The Untold Story of the
+James Webb Space Telescope", a NASA+ documentary, streamed from Mux as the
+sample video of the Video.js skin workbench. Courtesy of NASA, which does not
+endorse this project. The video is not part of this repository and is not
+covered by this license; the frames of it in media/ are there to show the skin.

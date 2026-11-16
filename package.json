@@ -1,6 +1,13 @@
 {
   "name": "red-thread",
   "version": "0.0.0",
+  "description": "A Video.js 10 skin where the whole player is one piece of string.",
+  "license": "Apache-2.0",
+  "homepage": "https://red-thread-skin.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/valeriodon/red-thread-skin.git"
+  },
   "private": true,
   "type": "module",
   "scripts": {
