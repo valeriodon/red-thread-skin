@@ -6,7 +6,8 @@ brings the controls back, captions and fullscreen.
 Usage: check.py <simulator udid> <output dir> [name@@url@@selector-of-the-player[@@mode] ...]
 Modes: play (default), full, and four for a page that hands the media its address at the first gesture
 (mux-video with data-src): auto and metadata set that preload value before the tap; early and early-none set the
-address five seconds before it, with preload metadata or none.
+address five seconds before it, with preload metadata or none; native asks for the browser's own HLS instead of
+hls.js. Pages on 127.0.0.1 are served by lab.py.
 Writes results.json and screenshots to the output dir, and prints a summary.
 """
 import json, os, subprocess, sys, time
@@ -206,7 +207,9 @@ class Page:
         time.sleep(1.5)
         d.execute_script(HOOKS)
         self.calibrate()
-        if self.mode in ('auto', 'metadata'):
+        if self.mode == 'native':
+            d.execute_script("document.querySelector('mux-video').source = { preferPlayback: 'native' }; return true;")
+        elif self.mode in ('auto', 'metadata'):
             d.execute_script("document.querySelector('mux-video').setAttribute('preload', arguments[0]); return true;", self.mode)
         elif self.mode in ('early', 'early-none'):
             d.execute_script("var m = document.querySelector('mux-video'); m.setAttribute('preload', arguments[0]); m.setAttribute('src', m.dataset.src); return true;",

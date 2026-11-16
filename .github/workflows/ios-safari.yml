@@ -16,6 +16,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Local lab (for pages on 127.0.0.1)
+        if: contains(inputs.pages, '127.0.0.1')
+        run: |
+          npm ci > /dev/null
+          npm run build:embed
+          python3 tools/ios-check/lab.py 8765 > lab.log 2>&1 &
+          for i in $(seq 1 15); do curl -s -o /dev/null http://127.0.0.1:8765/lab/static && break; sleep 1; done
+
       - name: Newest Xcode
         run: |
           XCODE=$(ls -d /Applications/Xcode_[0-9]*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
@@ -56,3 +64,4 @@ jobs:
           path: |
             out
             appium.log
+            lab.log
