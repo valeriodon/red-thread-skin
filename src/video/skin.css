@@ -342,16 +342,36 @@
     gap: 4px;
   }
 
-  /* Lines may run the width of the picture, short of the pull cord. */
+  /*
+   * Lines may run the width of the picture, short of the pull cord. They sit under the time and the icons,
+   * and move up into their place when those are away, clear of the middle of a picture this small.
+   */
   .rt-captions {
+    top: 14px;
     right: 8%;
     left: 8%;
     max-width: none;
+    transition:
+      translate 240ms ease,
+      opacity 160ms ease;
+    translate: 0 44px;
+  }
+
+  .rt-skin:has(.rt-top:not([data-visible])) .rt-captions {
     translate: none;
+  }
+
+  /* No room for the lines and the hanging preview together: the lines wait. */
+  .rt-skin[data-rt-preview] .rt-captions {
+    opacity: 0;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .rt-captions {
+    transition: none;
+  }
+
   .rt-captions[data-in] span {
     animation: none;
   }

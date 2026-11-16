@@ -395,6 +395,14 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   let ropes: HTMLCanvasElement | null = null;
   let savedStyle = '';
   let wasFullscreen = false;
+  // An iPhone has no fullscreen for a page's own elements, only Apple's player for the bare video. There the
+  // stretch ends with the skin filling the window and nothing is handed over. Inside a frame the window is
+  // only the frame, so there the handover stays.
+  const fillsWindow = () => {
+    // biome-ignore lint/suspicious/noExplicitAny: prefixed fullscreen flag
+    const doc = document as any;
+    return !(doc.fullscreenEnabled || doc.webkitFullscreenEnabled) && window.self === window.top;
+  };
 
   function stretchStart() {
     if (fsm.phase !== 'idle') return;
@@ -451,7 +459,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
 
   function toggleFullscreen(): boolean {
     const s = getStore();
-    if (!s || RM) return false;
+    if (!s || (RM && !fillsWindow())) return false;
     if (s.isFullscreen) return false; // leaving real fullscreen is the player's job; the release follows it
     if (fsm.phase === 'idle') stretchStart();
     else stretchRelease();
@@ -489,17 +497,19 @@ function mount(host: HTMLElement, signal: AbortSignal) {
 
   function stretchStep(now: number, dt: number, s: Store) {
     if (fsm.phase === 'idle' || !placeholder || !backdrop || !ropes) return;
+    // With reduced motion (only where the skin fills the window itself) each phase is a single step.
     if (fsm.phase === 'shoot') {
-      const k = Math.min(1, (now - fsm.t0) / 0.24);
+      const k = RM ? 1 : Math.min(1, (now - fsm.t0) / 0.24);
       fsm.a = 1 - (1 - k) ** 3;
       if (k >= 1) fsm.phase = 'pull';
     } else if (fsm.phase === 'pull') {
-      [fsm.g, fsm.gv] = spring(fsm.g, fsm.gv, 1, 95, 12, dt);
-      if (Math.abs(fsm.g - 1) < 0.012 && Math.abs(fsm.gv) < 0.12) {
+      if (RM) fsm.g = 1;
+      else [fsm.g, fsm.gv] = spring(fsm.g, fsm.gv, 1, 95, 12, dt);
+      if (RM || (Math.abs(fsm.g - 1) < 0.012 && Math.abs(fsm.gv) < 0.12)) {
         fsm.g = 1;
         fsm.gv = 0;
         fsm.phase = 'full';
-        Promise.resolve(s.requestFullscreen?.()).catch(() => {});
+        if (!fillsWindow()) Promise.resolve(s.requestFullscreen?.()).catch(() => {});
       }
     } else if (fsm.phase === 'full') {
       if (s.isFullscreen) wasFullscreen = true;
@@ -509,8 +519,9 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       }
     } else if (fsm.phase === 'release') {
       fsm.a = 1;
-      [fsm.g, fsm.gv] = spring(fsm.g, fsm.gv, 0, 130, 16, dt);
-      if (Math.abs(fsm.g) < 0.012 && Math.abs(fsm.gv) < 0.12) {
+      if (RM) fsm.g = 0;
+      else [fsm.g, fsm.gv] = spring(fsm.g, fsm.gv, 0, 130, 16, dt);
+      if (RM || (Math.abs(fsm.g) < 0.012 && Math.abs(fsm.gv) < 0.12)) {
         stretchEnd();
         return;
       }
@@ -546,7 +557,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     const tx = ropes.getContext('2d') as CanvasRenderingContext2D;
     tx.setTransform(d, 0, 0, d, 0, 0);
     tx.clearRect(0, 0, vw, vh);
-    if (fsm.phase === 'full') return;
+    if (fsm.phase === 'full' || RM) return;
     tx.lineCap = 'round';
     tx.lineWidth = 2.5;
     tx.strokeStyle = RED;
@@ -809,6 +820,8 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     // On a small player the lifted thread reaches the top bar: the bar steps back until the finger lets go.
     const crowded = touchY !== null && touchY < barH + 14;
     container.toggleAttribute('data-rt-lifted', crowded);
+    // A narrow player has no room for caption lines and the hanging preview together (see skin.css).
+    container.toggleAttribute('data-rt-preview', dur > 0 && (inZone || drag || !!glide || now < signHold));
     const topT = (!topBar || topBar.hasAttribute('data-visible')) && !crowded ? 1 : 0;
     topA = RM ? topT : topA + (topT - topA) * Math.min(1, dt * 10);
 
