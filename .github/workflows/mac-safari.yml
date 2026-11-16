@@ -1,0 +1,43 @@
+name: Mac Safari check
+
+# Plays the skin in Safari on a Mac: does the film start on a click, do captions show, does a click on the thread
+# seek. Run it by hand from the Actions tab; screenshots and results.json are in the artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      pages:
+        description: 'Pages to check, as name@@url@@selector-of-the-player, separated by spaces'
+        default: 'demo@@https://red-thread-skin.vercel.app/preview.html@@media-container'
+
+jobs:
+  mac:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Local lab (for pages on 127.0.0.1)
+        if: contains(inputs.pages, '127.0.0.1')
+        run: |
+          npm ci > /dev/null
+          npm run build:embed
+          python3 tools/ios-check/lab.py 8765 > lab.log 2>&1 &
+          for i in $(seq 1 15); do curl -s -o /dev/null http://127.0.0.1:8765/lab/static && break; sleep 1; done
+
+      - name: Safari's driver
+        run: |
+          sw_vers
+          sudo safaridriver --enable
+          python3 -m venv .venv
+          .venv/bin/pip install -q selenium
+
+      - name: Check the pages
+        run: .venv/bin/python tools/ios-check/mac.py out ${{ inputs.pages }}
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-safari
+          path: |
+            out
+            lab.log
