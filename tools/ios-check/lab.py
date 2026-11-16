@@ -5,7 +5,8 @@
     /lab/late        the same, but the address is handed over at the first gesture (as a page that asks nothing of
                      the video host until the visitor reaches for the player)
     /lab/js          the same, but the player is made by a script once the module has loaded
-                     (late and js take ?engine=native, startpos or pad0: see ENGINES)
+                     (late and js take ?engine=native, startpos or pad0: see ENGINES; late also takes
+                     ?fix=defer, reseek or pauseplay, and ?on=up: see FIXES)
     /embed/...       dist-embed/
     anything else    fetched from UPSTREAM, so a live page can be checked with one thing changed: add ?v=static
                      (address in the markup), ?v=static,nocase or ?v=static,nocss to its address
@@ -35,9 +36,37 @@ ENGINES = {
     'pad0': "{ engine: { hlsJs: { skipBufferHolePadding: 0 } } }",
 }
 
+# Ways out of a film that is asked to play before its first data, tried one at a time with ?fix=
+FIXES = {
+    # the first play waits until there is something to play
+    'defer': '''
+      media.setAttribute('preload', 'auto');
+      var inner = media.shadowRoot.querySelector('video'), play = media.play;
+      media.play = function () {
+        if (inner.readyState >= 3) { delete media.play; return play.call(media); }
+        return new Promise(function (resolve, reject) {
+          inner.addEventListener('canplay', function () { delete media.play; play.call(media).then(resolve, reject); }, { once: true });
+        });
+      };''',
+    # a film that sits still with data ahead of it is seeked again, or paused and played
+    'reseek': "watch(media, function (v) { v.currentTime = v.currentTime + 0.001; });",
+    'pauseplay': "watch(media, function (v) { v.pause(); v.play(); });",
+}
+
 ARM = '''<script>
   // The address reaches the media element at the first gesture on the player, and no earlier.
   var stage = document.getElementById('stage');
+  function watch(media, fix) {
+    var inner = media.shadowRoot.querySelector('video'), last = -1, still = 0, tries = 0;
+    setInterval(function () {
+      if (inner.paused || tries >= 3) return;
+      var t = inner.currentTime, ahead = 0;
+      for (var i = 0; i < inner.buffered.length; i++) if (inner.buffered.start(i) <= t + 0.05 && inner.buffered.end(i) > t) ahead = inner.buffered.end(i) - t;
+      still = t === last && ahead > 1 ? still + 1 : 0;
+      last = t;
+      if (still >= 4) { still = 0; tries++; fix(inner); }
+    }, 250);
+  }
   function arm() {
     var media = stage.querySelector('mux-video');
     if (media && !media.getAttribute('src') && media.dataset.src) {
@@ -45,7 +74,7 @@ ARM = '''<script>
       media.setAttribute('src', media.dataset.src);
     }
   }
-  ['pointerdown', 'touchstart', 'keydown', 'focusin'].forEach(function (type) { stage.addEventListener(type, arm, { capture: true, passive: true }); });
+  %s.forEach(function (type) { stage.addEventListener(type, arm, { capture: true, passive: true }); });
 </script>'''
 
 
@@ -54,8 +83,11 @@ def skin(media):
     return template.replace('<!-- Add a compatible media component here. -->', media)
 
 
-def lab_page(name, engine=None):
+def lab_page(name, engine=None, fix=None, on=None):
     source = 'media.source = %s;' % ENGINES[engine] if engine in ENGINES else ''
+    source += FIXES.get(fix, '')
+    # which events hand the address over: by default the earliest ones, with ?on=up only a finished gesture
+    events = "['pointerup', 'keydown']" if on == 'up' else "['pointerdown', 'touchstart', 'keydown', 'focusin']"
     track = '<track kind="chapters" label="English" srclang="en" src="/lab/chapters.vtt" default>'
     module = '<script type="module" src="/embed/red-thread.js"></script>'
     if name == 'static':
@@ -63,7 +95,7 @@ def lab_page(name, engine=None):
         return HEAD % (name, 'Address in the markup.') + '<video-player>' + skin(media) + '</video-player></div></main>' + module
     if name == 'late':
         media = '<mux-video data-src="%s" preload="none" playsinline crossorigin>%s</mux-video>' % (SRC, track)
-        return HEAD % (name, 'Address at the first gesture.') + '<video-player>' + skin(media) + '</video-player></div></main>' + module + ARM % source
+        return HEAD % (name, 'Address at the first gesture.') + '<video-player>' + skin(media) + '</video-player></div></main>' + module + ARM % (source, events)
     if name == 'js':
         media = '<mux-video playsinline crossorigin>%s</mux-video>' % track
         script = '''<script type="module">
@@ -111,7 +143,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/lab/chapters.vtt':
             return self.send(200, CHAPTERS, 'text/vtt; charset=utf-8')
         if path.startswith('/lab/'):
-            page = lab_page(path[5:], query.get('engine', [None])[0])
+            page = lab_page(path[5:], *[query.get(k, [None])[0] for k in ('engine', 'fix', 'on')])
             return self.send(200, page, 'text/html; charset=utf-8') if page else self.send(404, 'no such lab page', 'text/plain')
         if path.startswith('/embed/'):
             file = os.path.normpath(os.path.join(ROOT, 'dist-embed', path[7:]))
