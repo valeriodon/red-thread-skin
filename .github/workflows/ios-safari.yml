@@ -1,0 +1,58 @@
+name: iPhone Safari check
+
+# Plays the skin in Safari on an iPhone simulator with real touches: does the film start, where do captions sit,
+# what does fullscreen do. Run it by hand from the Actions tab; screenshots and results.json are in the artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      pages:
+        description: 'Pages to check, as name=url=selector-of-the-player, separated by spaces'
+        default: 'demo=https://red-thread-skin.vercel.app/preview.html=media-container'
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Newest Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_[0-9]*.app 2>/dev/null | grep -v -i beta | sort -V | tail -1)
+          if [ -n "$XCODE" ]; then sudo xcode-select -s "$XCODE/Contents/Developer"; fi
+          xcodebuild -version
+
+      - name: iPhone simulator
+        id: sim
+        run: python3 tools/ios-check/sim.py | tee -a "$GITHUB_OUTPUT"
+
+      - name: Simulator app open
+        run: |
+          open -a "$(xcode-select -p)/Applications/Simulator.app" --args -CurrentDeviceUDID "${{ steps.sim.outputs.udid }}"
+          sleep 15
+
+      - name: Appium
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -q Appium-Python-Client
+          npm install -g appium > /dev/null
+          appium driver install xcuitest
+          appium --log-level info --log appium.log &
+          for i in $(seq 1 30); do curl -s http://127.0.0.1:4723/status > /dev/null && break; sleep 2; done
+
+      - name: Check the pages
+        run: .venv/bin/python tools/ios-check/check.py "${{ steps.sim.outputs.udid }}" out ${{ inputs.pages }}
+
+      - name: Results
+        if: always()
+        run: |
+          echo "device=${{ steps.sim.outputs.name }} iOS ${{ steps.sim.outputs.runtime }}" | tee out/device.txt || true
+          cat out/results.json 2>/dev/null | head -c 60000 || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-safari
+          path: |
+            out
+            appium.log
