@@ -5,7 +5,8 @@ For each page: tap the picture and report whether the film plays; with the mode 
 brings the controls back, captions and fullscreen.
 A page that holds the player in a frame (the demo's home page) is followed into the frame.
 Usage: check.py <simulator udid> <output dir> [name@@url@@selector-of-the-player[@@mode] ...]
-Modes: play (default) or full, each also with the phone turned on its side: play-landscape, full-landscape.
+Modes: play (default), full, or fs (play, then only the fullscreen step); each also with the phone turned on its
+side: play-landscape, full-landscape, fs-landscape.
 Pages on 127.0.0.1 are served by lab.py.
 Writes results.json and screenshots to the output dir, and prints a summary.
 """
@@ -161,11 +162,13 @@ class Page:
             # seen moving at any of the three looks: on a slow runner the film can be over before the last one
             self.playing = self.playing or ((s['paused'] is False) and (s['t'] or 0) > 1.0)
         shot(self.name + '-2-after-tap')
-        if not self.playing or self.mode != 'full':
+        if not self.playing or self.mode not in ('full', 'fs'):
             return
 
         # 2. with the bar away, a tap only brings it back: the film keeps playing
         try:
+            if self.mode == 'fs':
+                raise StopIteration
             for _ in range(8):
                 if not s['topVisible']:
                     break
@@ -174,11 +177,15 @@ class Page:
             self.tap_picture(s)
             time.sleep(0.5)
             s = self.state('tap with the bar away (expected: still playing)')
+        except StopIteration:
+            pass
         except Exception as e:
             log('  reveal step failed:', type(e).__name__, str(e)[:200])
 
         # 3. captions, switched on through the real button's click handler (a touch on it is checked in the lab)
         try:
+            if self.mode == 'fs':
+                raise StopIteration
             d.execute_script("document.querySelector('.rt-captions-button').click(); document.querySelector('video-player').store.seek(28.3); return true;")
             time.sleep(2.5)
             s = self.state('captions on')
@@ -186,6 +193,8 @@ class Page:
             time.sleep(2.5)
             s = self.state('captions on, bar away')
             shot(self.name + '-4-captions-bar-away')
+        except StopIteration:
+            pass
         except Exception as e:
             log('  captions step failed:', type(e).__name__, str(e)[:200])
 
