@@ -87,6 +87,7 @@ return {
   inner: inner ? { src: String(inner.currentSrc || inner.src || '').slice(0, 12), readyState: inner.readyState, networkState: inner.networkState, paused: inner.paused, err: inner.error ? inner.error.code : null, sources: [].map.call(inner.querySelectorAll('source'), function (q) { return (q.type || '?') + ' ' + String(q.src).slice(0, 5); }), mode: inner.webkitPresentationMode || null,
     buffered: spans(inner.buffered), preload: inner.preload, noRemote: inner.disableRemotePlayback, size: [inner.videoWidth, inner.videoHeight], seeking: inner.seeking,
     decoded: [inner.webkitVideoDecodedByteCount, inner.webkitAudioDecodedByteCount], tracks: [].map.call(inner.textTracks, function (t) { return t.kind + ':' + t.mode + (t.mode === 'showing' && t.activeCues && t.activeCues.length ? ':"' + String(t.activeCues[0].text).slice(0, 30) + '"' : ''); }) } : null,
+  trackEls: inner ? [].map.call(inner.querySelectorAll('track'), function (t) { return t.kind + ':' + t.track.mode + ':' + t.readyState; }) : null,
   hls: hls, preloadHost: m ? m.getAttribute('preload') : null, visible: document.visibilityState,
   mse: 'MediaSource' in window, mms: 'ManagedMediaSource' in window, fullscreenEnabled: !!(document.fullscreenEnabled || document.webkitFullscreenEnabled), isFullscreen: s ? s.isFullscreen : null,
   volumeAvailability: s ? s.volumeAvailability : null, subtitles: s ? s.subtitlesShowing : null, topVisible: !!document.querySelector('.rt-top[data-visible]'),

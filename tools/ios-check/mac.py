@@ -34,9 +34,9 @@ def state(name, sel, label, steps):
     s = d.execute_script(STATE, sel)
     s['step'] = label
     steps.append(s)
-    log('  [%s] %s: paused=%s t=%s waiting=%s subtitles=%s caption=%s err=%s inner=%s hls=%s events=%s errors=%s' % (
+    log('  [%s] %s: paused=%s t=%s waiting=%s subtitles=%s caption=%s err=%s trackEls=%s inner=%s hls=%s events=%s errors=%s' % (
         name, label, s['paused'], s['t'], s['waiting'], s['subtitles'], json.dumps(s['caption']), s['error'],
-        json.dumps(s['inner']), json.dumps(s['hls']), s['events'], s['errors']))
+        json.dumps(s['trackEls']), json.dumps(s['inner']), json.dumps(s['hls']), s['events'], s['errors']))
     return s
 
 

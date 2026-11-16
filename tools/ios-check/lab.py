@@ -99,7 +99,8 @@ RAW = '''<!doctype html>
   window.__state = () => {
     const v = video(), b = [];
     for (let i = 0; i < v.buffered.length; i++) b.push([+v.buffered.start(i).toFixed(2), +v.buffered.end(i).toFixed(2)]);
-    return { paused: v.paused, t: +v.currentTime.toFixed(2), readyState: v.readyState, networkState: v.networkState, preload: v.preload, src: String(v.currentSrc || v.src).slice(0, 12), buffered: b, err: v.error ? v.error.code : null, events: window.__ev.splice(0) };
+    const tracks = [...v.querySelectorAll('track')].map((t) => t.kind + ':' + t.track.mode + ':' + t.readyState);
+    return { tracks, paused: v.paused, t: +v.currentTime.toFixed(2), readyState: v.readyState, networkState: v.networkState, preload: v.preload, src: String(v.currentSrc || v.src).slice(0, 12), buffered: b, err: v.error ? v.error.code : null, events: window.__ev.splice(0) };
   };
   const note = (p) => { if (p && p.catch) p.catch((e) => window.__ev.push('play rejected: ' + e.name)); };
   %(start)s
@@ -126,6 +127,9 @@ RAW_KINDS = {
                 start="const m = document.querySelector('mux-video'); go.addEventListener('pointerdown', () => m.setAttribute('src', SRC)); go.addEventListener('click', () => note(m.play()));"),
     'mux-auto': dict(markup='<mux-video preload="auto" playsinline crossorigin></mux-video>', imports="import '/embed/red-thread.js';",
                      start="const m = document.querySelector('mux-video'); go.addEventListener('pointerdown', () => m.setAttribute('src', SRC)); go.addEventListener('click', () => note(m.play()));"),
+    # the same with a chapters track beside it, loaded long before the address arrives
+    'player-chapters': dict(markup='<video-player><mux-video preload="none" playsinline crossorigin><track kind="chapters" label="English" srclang="en" src="/lab/chapters.vtt" default></mux-video></video-player>', imports="import '/embed/red-thread.js';",
+                            start="const m = document.querySelector('mux-video'); go.addEventListener('pointerdown', () => m.setAttribute('src', SRC)); go.addEventListener('click', () => note(document.querySelector('video-player').store.play()));"),
     # the element inside a player, still with no skin: the player's store asks for play
     'player': dict(markup='<video-player><mux-video preload="none" playsinline crossorigin></mux-video></video-player>', imports="import '/embed/red-thread.js';",
                    start="const m = document.querySelector('mux-video'); go.addEventListener('pointerdown', () => m.setAttribute('src', SRC)); go.addEventListener('click', () => note(document.querySelector('video-player').store.play()));"),
@@ -144,7 +148,10 @@ def skin(media):
     return template.replace('<!-- Add a compatible media component here. -->', media)
 
 
-def lab_page(name, engine=None, fix=None, on=None):
+STORYBOARD = '<track kind="metadata" label="thumbnails" default data-storyboard>'
+
+
+def lab_page(name, engine=None, fix=None, on=None, tracks=None):
     if fix and fix.endswith('-up'):  # a single parameter, so the address needs no quoting in a shell
         fix, on = fix[:-3], 'up'
     source = 'media.source = %s;' % ENGINES[engine] if engine in ENGINES else ''
@@ -152,6 +159,12 @@ def lab_page(name, engine=None, fix=None, on=None):
     # which events hand the address over: by default the earliest ones, with ?on=up only a finished gesture
     events = "['pointerup', 'keydown']" if on == 'up' else "['pointerdown', 'touchstart', 'keydown', 'focusin']"
     track = '<track kind="chapters" label="English" srclang="en" src="/lab/chapters.vtt" default>'
+    # ?tracks=none leaves the chapters out; ?tracks=storyboard also places the track <mux-video> would otherwise add
+    # when the address arrives (it then only fills in that track's address, and re-inserts nothing)
+    if tracks == 'none':
+        track = ''
+    elif tracks == 'storyboard':
+        track += STORYBOARD
     module = '<script type="module" src="/embed/red-thread.js"></script>'
     if name == 'static':
         media = '<mux-video src="%s" preload="metadata" playsinline crossorigin>%s</mux-video>' % (SRC, track)
@@ -180,6 +193,8 @@ def changed(html, variants):
     if 'static' in variants:
         html = re.sub(r'(<mux-video\b[^>]*?)\bdata-src=', r'\1src=', html)
         html = re.sub(r'(<mux-video\b[^>]*?)preload="none"', r'\1preload="metadata"', html)
+    if 'storyboard' in variants:
+        html = re.sub(r'(<mux-video\b[^>]*>\s*<track\b[^>]*>)', lambda m: m.group(1) + STORYBOARD, html, count=1)
     if 'nocase' in variants:
         html = re.sub(r'<script[^>]*red-thread-case\.js[^>]*></script>', '', html)
     if 'nocss' in variants:
@@ -211,7 +226,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/hlsjs/hls.min.js':
             return self.send(200, open(os.path.join(ROOT, 'node_modules/hls.js/dist/hls.min.js'), 'rb').read(), 'text/javascript')
         if path.startswith('/lab/'):
-            page = lab_page(path[5:], *[query.get(k, [None])[0] for k in ('engine', 'fix', 'on')])
+            page = lab_page(path[5:], *[query.get(k, [None])[0] for k in ('engine', 'fix', 'on', 'tracks')])
             return self.send(200, page, 'text/html; charset=utf-8') if page else self.send(404, 'no such lab page', 'text/plain')
         if path.startswith('/embed/'):
             file = os.path.normpath(os.path.join(ROOT, 'dist-embed', path[7:]))
