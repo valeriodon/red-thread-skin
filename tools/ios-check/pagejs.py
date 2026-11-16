@@ -88,7 +88,13 @@ return {
     buffered: spans(inner.buffered), preload: inner.preload, noRemote: inner.disableRemotePlayback, size: [inner.videoWidth, inner.videoHeight], seeking: inner.seeking,
     decoded: [inner.webkitVideoDecodedByteCount, inner.webkitAudioDecodedByteCount], tracks: [].map.call(inner.textTracks, function (t) { return t.kind + ':' + t.mode + (t.mode === 'showing' && t.activeCues && t.activeCues.length ? ':"' + String(t.activeCues[0].text).slice(0, 30) + '"' : ''); }) } : null,
   window: { top: window.self === window.top, share: +(innerWidth * innerHeight / (screen.width * screen.height)).toFixed(3), screen: [screen.width, screen.height], fullscreenEnabled: !!(document.fullscreenEnabled || document.webkitFullscreenEnabled) },
-  ui: (function () { var c = document.querySelector('.rt-thread canvas'); return c ? +getComputedStyle(c).opacity : null; })(),
+  ui: (function () {
+    // how much of the skin is on the picture: 1 here, 0 reeled out (or faded, with reduced motion)
+    var c = document.querySelector('.rt-thread canvas'), k = document.querySelector('media-container');
+    if (!c || !k) return null;
+    var g = parseFloat(getComputedStyle(k).getPropertyValue('--rt-gone')) || 0;
+    return +(+getComputedStyle(c).opacity * (1 - Math.min(1, Math.max(0, g)))).toFixed(2);
+  })(),
   trackEls: inner ? [].map.call(inner.querySelectorAll('track'), function (t) { return t.kind + ':' + t.track.mode + ':' + t.readyState; }) : null,
   hls: hls, preloadHost: m ? m.getAttribute('preload') : null, visible: document.visibilityState,
   mse: 'MediaSource' in window, mms: 'ManagedMediaSource' in window, fullscreenEnabled: !!(document.fullscreenEnabled || document.webkitFullscreenEnabled), isFullscreen: s ? s.isFullscreen : null,

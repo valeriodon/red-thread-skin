@@ -100,7 +100,7 @@
   touch-action: pan-y;
 }
 
-/* Left alone while the film plays, the skin fades out (red-thread.ts) and the pointer goes with it. */
+/* Left alone while the film plays, the skin leaves the picture (red-thread.ts) and the pointer goes with it. */
 .rt-skin[data-rt-away],
 .rt-skin[data-rt-away] .rt-thread canvas {
   cursor: none;
@@ -121,6 +121,9 @@
   gap: 12px;
   align-items: center;
   padding: clamp(8px, 2cqw, 16px) calc(clamp(18px, 4cqw, 40px) + 34px) 0 clamp(12px, 3cqw, 26px);
+  /* Left alone, the skin lets go: red-thread.ts runs --rt-gone from 0 to 1 on a spring, and the bar slides out of
+     the top with it, as the thread is reeled in and the cord runs up. */
+  translate: 0 calc(var(--rt-gone, 0) * -135%);
   transition: opacity 240ms ease;
 }
 

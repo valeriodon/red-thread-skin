@@ -152,7 +152,17 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     fs: { h: 0, c: 0, v: 0, at: -9, a: 0 },
   };
   let topA = 1;
-  // The whole drawing: 1 while the skin is awake, 0 when the film has been left alone and it has faded out.
+  // Left alone while the film plays, the skin lets go of the picture. `gone` runs from 0 (here) to 1 (away): the
+  // thread is reeled in to the left like a tape measure, the cord runs up, the time and the icons slide out of the
+  // top. Coming back it overshoots and settles, like a spring let go. With reduced motion the drawing fades instead
+  // (`uiA`), and nothing moves.
+  let gone = 0;
+  let goneV = 0;
+  let goneShown = 0;
+  let landed = true;
+  let wasAwake = true;
+  let cordLenV = 0;
+  let cordSprung = -9;
   let uiA = 1;
   let shownA = 1;
   let lastCue = '';
@@ -253,11 +263,11 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       }
       container.setAttribute('data-rt-pointer', '');
       container.focus({ preventScroll: true });
-      if (e.pointerType !== 'mouse' && away()) {
-        // The skin is fading out, or gone: a finger only brings it back, and never plucks a thread or pulls a cord
-        // nobody can see. (A mouse has to move to get there, and moving wakes the skin first.)
+      if ((e.pointerType !== 'mouse' && away()) || gone > 0.5 || uiA < 0.5) {
+        // The skin is leaving, or gone: nothing plucks a thread or pulls a cord nobody can see. A finger only brings
+        // the skin back; a click that comes without a move first does what a click on the picture does.
         tap = { x: px, y: py };
-        reveal = true;
+        reveal = e.pointerType !== 'mouse';
       } else if (onCord()) {
         volDrag = true;
         tap = { x: px, y: py };
@@ -668,7 +678,10 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       const a = clamp(pu, 0.03, 0.97);
       y += u < a ? (pull * u) / a : (pull * (1 - u)) / (1 - a);
     }
-    return [PAD() + u * (W - 2 * PAD()), yb + y];
+    // Reeled in, the thread shortens towards its left pin and the pin follows it off the picture; while it runs,
+    // its free end whips a little.
+    if (gone) y += clamp(goneV, -4, 4) * 2.2 * Math.sin(u * 9 - now * 22) * (0.35 + 0.65 * u);
+    return [PAD() - Math.max(0, gone) * (PAD() + 30) + u * (W - 2 * PAD()) * (1 - gone), yb + y];
   }
 
   function resample(Q: Point[], n: number): Point[] {
@@ -715,6 +728,8 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     };
     sx.lineCap = 'round';
     sx.globalAlpha = topA;
+    // On their way out the strands come loose from their pins.
+    const slack = clamp(gone, 0, 1);
     // Captions: two strands on pins. Loose and white when off, tight and red when on.
     const ccAt = box(ccBtn);
     if (ccAt) {
@@ -731,8 +746,8 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       const k = 1 - icon.c;
       sx.strokeStyle = on ? RED : 'rgba(255,255,255,.85)';
       sx.lineWidth = 2.2;
-      curve(x - 10, y - 4.5, x + 10, y - 4.5, 0, k * 6.5 + vib);
-      curve(x - 10, y + 4.5, x + 3 + 7 * k, y + 4.5, 0, k * 5 - vib * 0.8);
+      curve(x - 10, y - 4.5, x + 10, y - 4.5, 0, k * 6.5 + vib + slack * 7);
+      curve(x - 10, y + 4.5, x + 3 + 7 * k, y + 4.5, 0, k * 5 - vib * 0.8 + slack * 7);
       pin(x - 10, y - 4.5);
       pin(x + 10, y - 4.5);
       pin(x - 10, y + 4.5);
@@ -747,7 +762,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       else [icon.c, icon.v] = spring(icon.c, icon.v, icon.h, 170, 10, dt);
       const [x, y] = fsAt;
       const e = (on ? 5.5 : 7) + 2.5 * icon.c;
-      const b = (1 - icon.c) * 2.8 + vibOf(icon);
+      const b = (1 - icon.c) * 2.8 + vibOf(icon) + slack * 5;
       sx.strokeStyle = on ? RED : 'rgba(255,255,255,.9)';
       sx.lineWidth = 2;
       curve(x - e, y - e, x + e, y - e, 0, b);
@@ -877,14 +892,45 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     // A narrow player has no room for caption lines and the hanging preview together (see skin.css).
     container.toggleAttribute('data-rt-preview', dur > 0 && (inZone || drag || !!glide || now < signHold));
     const topT = (!topBar || topBar.hasAttribute('data-visible')) && !crowded ? 1 : 0;
-    topA = RM ? topT : topA + (topT - topA) * Math.min(1, dt * 10);
+    topA = RM ? topT : topA + (topT - topA) * Math.min(1, dt * (topT ? 10 : 5));
     // Left alone while the film plays (no pointer, tap or key for two seconds, or the pointer off the player), the
     // whole skin fades out with the time and the icons, and any of the three brings it back. It stays while it has
     // something to say or to do: buffering, a preview on the thread, the cord in hand, the stretch to fullscreen.
     const awake =
       !away() || waiting || active || volDrag || volHover || intro < 1 || (fsm.phase !== 'idle' && fsm.phase !== 'full');
+    if (awake !== wasAwake) {
+      wasAwake = awake;
+      cordSprung = now;
+      if (awake && !RM) {
+        // The pins take the strain again.
+        cordV += 1.6;
+        kick(ico.cc, 2.4);
+        kick(ico.fs, 2.4);
+      }
+    }
+    if (RM) {
+      gone = 0;
+      goneV = 0;
+      landed = true;
+    } else {
+      // Leaving is one pull, with no bounce to see; coming back overshoots and settles.
+      [gone, goneV] = awake ? spring(gone, goneV, 0, 190, 17, dt) : spring(gone, goneV, 1.04, 170, 22, dt);
+      if (!awake && gone > 0.9) landed = false;
+      if (awake && !landed && gone < 0.04) {
+        // Back on its pins, the thread rings.
+        landed = true;
+        pluck(0.7, 4);
+      }
+      if (awake && Math.abs(gone) < 0.0015 && Math.abs(goneV) < 0.02) gone = goneV = 0;
+    }
+    // The time and the icons ride the same spring (skin.css).
+    const goneNow = Math.round(gone * 500) / 500;
+    if (goneNow !== goneShown) {
+      goneShown = goneNow;
+      container.style.setProperty('--rt-gone', String(goneNow));
+    }
     uiA += ((awake ? 1 : 0) - uiA) * Math.min(1, dt * (awake ? 12 : 4));
-    const shown = uiA > 0.996 ? 1 : uiA < 0.004 ? 0 : Math.round(uiA * 200) / 200;
+    const shown = !RM || uiA > 0.996 ? 1 : uiA < 0.004 ? 0 : Math.round(uiA * 200) / 200;
     if (shown !== shownA) {
       shownA = shown;
       canvas.style.opacity = String(shown);
@@ -892,14 +938,22 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     container.toggleAttribute('data-rt-away', !awake);
 
     volumeFixed = s.volumeAvailability === 'unsupported';
-    const cordT = muted ? CORD_MUTED : CORD(volumeFixed ? 0.6 : volume);
+    // Away, the cord has run up out of the picture, knob and all.
+    const cordT = !awake && !RM ? -20 : muted ? CORD_MUTED : CORD(volumeFixed ? 0.6 : volume);
     if (RM) {
       // The cord takes its length at once and hangs still.
       cordLen = cordT;
+      cordLenV = 0;
       cordAng = 0;
       cordV = 0;
     } else {
-      cordLen = cordLen ? cordLen + (cordT - cordLen) * Math.min(1, dt * 10) : cordT;
+      if (!volDrag && now - cordSprung < 1.6) {
+        // Let go or called back, it runs on a spring and bounces once at the end.
+        [cordLen, cordLenV] = spring(cordLen, cordLenV, cordT, 170, 15, dt);
+      } else {
+        cordLen = cordLen ? cordLen + (cordT - cordLen) * Math.min(1, dt * 10) : cordT;
+        cordLenV = 0;
+      }
       [cordAng, cordV] = spring(cordAng, cordV, 0, 60, 4, dt);
       cordAng = clamp(cordAng, -0.7, 0.7);
     }
@@ -1146,7 +1200,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       sliderEl.style.height = '48px';
     }
     // Focused while playing, the play button shows a pause sign made of two strands.
-    if (playing && focused(playBtn)) {
+    if (playing && focused(playBtn) && gone < 0.5 && uiA > 0.5) {
       const c = box(playBtn);
       if (c) {
         const r = Math.min(W, H) * 0.07;
