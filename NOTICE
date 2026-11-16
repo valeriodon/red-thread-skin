@@ -9,8 +9,8 @@ under the Apache License, Version 2.0. "Video.js" is a registered trademark of
 Brightcove Inc.
 
 The demo plays the official trailer of "Cosmic Dawn: The Untold Story of the
-James Webb Space Telescope", a NASA+ documentary, streamed from Mux as the
-sample video of the Video.js skin workbench. Credit: NASA's Goddard Space
-Flight Center, which does not endorse this project. The video is not part of
+James Webb Space Telescope", a NASA+ documentary, taken from the public download
+of NASA's Scientific Visualization Studio and hosted on Mux. Credit: NASA's
+Goddard Space Flight Center, which does not endorse this project. The video is not part of
 this repository and is not covered by this license; the frames of it in media/
 are there to show the skin.
