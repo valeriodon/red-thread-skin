@@ -2,7 +2,7 @@
 
 A Video.js 10 skin where the whole player is one piece of string.
 
-**[Live demo](https://red-thread-skin.vercel.app)** · [the player on its own page](https://red-thread-skin.vercel.app/preview.html) · [55 second video](media/red-thread-demo.mp4)
+**[Live demo](https://red-thread-skin.vercel.app)** · [the player on its own page](https://red-thread-skin.vercel.app/preview.html) · [55 second video](media/red-thread-demo.mp4) · [at work on my portfolio](https://valeriodonfrancesco.pro/work/red-thread.html)
 
 [![Red Thread paused: the thread folds into a play button over the picture](media/red-thread.jpg)](https://red-thread-skin.vercel.app)
 
@@ -63,6 +63,8 @@ The skin is the four files in `src/video/`: `skin.html` (the markup), `skin.css`
   <mux-video src="https://stream.mux.com/PLAYBACK_ID.m3u8" playsinline crossorigin></mux-video>
 </video-player>
 ```
+
+My portfolio is a static site and runs the skin this way, with square corners and its own typefaces set through the custom properties below: [valeriodonfrancesco.pro/work/red-thread.html](https://valeriodonfrancesco.pro/work/red-thread.html).
 
 What the thread shows comes from the media:
 
