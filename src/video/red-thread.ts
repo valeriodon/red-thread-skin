@@ -407,12 +407,41 @@ function mount(host: HTMLElement, signal: AbortSignal) {
   let wasFullscreen = false;
   // An iPhone has no fullscreen for a page's own elements, only Apple's player for the bare video. There the
   // stretch ends with the skin filling the window and nothing is handed over. A frame that is most of the
-  // screen (a demo page around the player) is as good as the window; in a small embed the handover stays.
+  // page around it (a demo page around the player) is as good as the window; in a small embed the handover stays.
   const fillsWindow = () => {
     // biome-ignore lint/suspicious/noExplicitAny: prefixed fullscreen flag
     const doc = document as any;
     if (doc.fullscreenEnabled || doc.webkitFullscreenEnabled) return false;
-    return window.self === window.top || window.innerWidth * window.innerHeight >= 0.55 * screen.width * screen.height;
+    if (window.self === window.top) return true;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    try {
+      // A frame on the same site is measured against the page that holds it.
+      const page = window.top as Window;
+      return w >= 0.9 * page.innerWidth && h >= 0.6 * page.innerHeight;
+    } catch {
+      // Elsewhere, against the screen as the phone is held: on its side the browser's bars take a good part of it.
+      const turned =
+        (screen.orientation?.type ?? '').startsWith('landscape') || Math.abs(Number(window.orientation) || 0) === 90;
+      const long = Math.max(screen.width, screen.height);
+      const short = Math.min(screen.width, screen.height);
+      return w >= 0.8 * (turned ? long : short) && h >= 0.5 * (turned ? short : long);
+    }
+  };
+
+  // How much of this window's height can be seen. A frame on the same site may hang below the fold of the page that
+  // holds it (on an iPhone, under Safari's bar); what fills the window stops where that page does.
+  const seenHeight = () => {
+    const h = window.innerHeight;
+    if (window.self === window.top) return h;
+    try {
+      const frame = window.frameElement;
+      if (!frame || window.parent !== window.top) return h;
+      const below = frame.getBoundingClientRect().top + h - (window.top as Window).innerHeight;
+      return below > 0 ? Math.max(h - below, h / 2) : h;
+    } catch {
+      return h;
+    }
   };
 
   function stretchStart() {
@@ -539,7 +568,7 @@ function mount(host: HTMLElement, signal: AbortSignal) {
     }
     const r = placeholder.getBoundingClientRect();
     const vw = window.innerWidth;
-    const vh = window.innerHeight;
+    const vh = seenHeight();
     const g = fsm.g;
     const gc = clamp(g, 0, 1);
     const x0 = r.left * (1 - g);
@@ -561,13 +590,15 @@ function mount(host: HTMLElement, signal: AbortSignal) {
       Math.max(fsm.phase === 'shoot' ? fsm.a * 0.35 : 0.35 * (fsm.phase === 'pull' ? 1 : gc), gc * 0.94)
     );
     const d = Math.min(2, window.devicePixelRatio || 1);
-    if (ropes.width !== Math.round(vw * d) || ropes.height !== Math.round(vh * d)) {
+    // The canvas for the four threads covers the whole window; they are pinned to the corners of what can be seen.
+    const wh = window.innerHeight;
+    if (ropes.width !== Math.round(vw * d) || ropes.height !== Math.round(wh * d)) {
       ropes.width = Math.round(vw * d);
-      ropes.height = Math.round(vh * d);
+      ropes.height = Math.round(wh * d);
     }
     const tx = ropes.getContext('2d') as CanvasRenderingContext2D;
     tx.setTransform(d, 0, 0, d, 0, 0);
-    tx.clearRect(0, 0, vw, vh);
+    tx.clearRect(0, 0, vw, wh);
     if (fsm.phase === 'full' || RM) return;
     tx.lineCap = 'round';
     tx.lineWidth = 2.5;
