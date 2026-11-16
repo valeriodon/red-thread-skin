@@ -21,5 +21,62 @@ export function createPlayer(): HTMLElement {
     `<mux-video src="${SRC}" playsinline crossorigin><track kind="chapters" label="English" srclang="en" src="${CHAPTERS}" default></mux-video>`
   );
 
+  // The elements would upgrade when the player joins the page; upgrading them here gives the media its methods now.
+  customElements.upgrade(player);
+  holdFirstPlay(player.querySelector<MediaElement>('mux-video')!);
+
   return player;
+}
+
+type MediaElement = HTMLElement & { play(): Promise<void>; pause(): void };
+
+/**
+ * Makes the first play wait until there is something to play.
+ *
+ * This film's sound begins 21 ms after its picture, and hls.js steps over that with a seek when a film that should
+ * be playing has not moved yet. Asked to play with nothing loaded (`preload="none"`, or a quick hand), that seek can
+ * land before Safari has its first frame; Safari then reports the film as playing and leaves it at 0.12 s for good.
+ * Loaded first and played after, Safari starts by itself, and the seek, if it still comes, does no harm.
+ *
+ * The play is asked for and withdrawn at once, inside the gesture, so the browser lets the film start by itself when
+ * the data is in; `preload` keeps its meaning, since a withdrawn play still tells hls.js to load.
+ */
+function holdFirstPlay(media: MediaElement): void {
+  const video = media.shadowRoot?.querySelector('video');
+  if (!video) return;
+
+  const play = media.play;
+  const release = () => delete (media as { play?: unknown }).play;
+  let pending: Promise<void> | undefined;
+
+  Object.defineProperty(media, 'play', {
+    configurable: true,
+    value(): Promise<void> {
+      if (pending) return pending;
+
+      if (video.readyState > HTMLMediaElement.HAVE_CURRENT_DATA) {
+        release();
+        return play.call(media);
+      }
+
+      void play.call(media).catch(() => undefined);
+      media.pause();
+
+      pending = new Promise<void>((resolve, reject) => {
+        let held = true;
+        const start = () => {
+          if (!held) return;
+          held = false;
+          release();
+          play.call(media).then(resolve, reject);
+        };
+
+        video.addEventListener('canplay', start, { once: true });
+        // A film that never gets that far is played as asked, and says what is wrong.
+        setTimeout(start, 10_000);
+      });
+
+      return pending;
+    },
+  });
 }

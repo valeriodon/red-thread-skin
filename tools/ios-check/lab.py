@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""A small local site for the iPhone check, to tell apart what a page does from what the skin's build does.
+"""A small local site for the checks, to tell apart what a page does from what the layers under it do.
 
     /lab/static      the embed build (dist-embed/) on a bare page, the media address in the markup
     /lab/late        the same, but the address is handed over at the first gesture (as a page that asks nothing of
-                     the video host until the visitor reaches for the player)
-    /lab/js          the same, but the player is made by a script once the module has loaded
-                     (late and js take ?engine=native, startpos or pad0: see ENGINES; late also takes
-                     ?fix=defer, defer-up, reseek or pauseplay: see FIXES)
+                     the video host until the visitor reaches for the player). ?tracks=none leaves the chapters
+                     track out; ?tracks=storyboard also places the storyboard track <mux-video> would add
+    /lab/js          the same as static, but the player is made by a script once the module has loaded
     /lab/raw/<kind>  no skin: a bare video, hls.js alone, the media element alone or inside a player (see RAW_KINDS)
     /embed/...       dist-embed/
     anything else    fetched from UPSTREAM, so a live page can be checked with one thing changed: add ?v=static
-                     (address in the markup), ?v=static,nocase or ?v=static,nocss to its address
+                     (address in the markup), ?v=storyboard (storyboard track in the markup), nocase or nocss,
+                     joined by commas
+
+What it was built to find: in Safari a film whose address arrives after its <track> children have loaded never
+starts (/lab/late against /lab/late?tracks=storyboard, and /lab/raw/player-chapters without any skin), and a film
+asked to play before its first data can stay at 0.12 s (/lab/raw/player a few times over).
 
 Usage: lab.py [port] [upstream origin]   (run `npm run build:embed` first)
 """
@@ -31,51 +35,14 @@ HEAD = '''<!doctype html>
 <style>body { margin: 0; background: #14110f; color: #eee; font: 16px system-ui; } main { padding: 120px 16px 900px; }</style>
 <main><p>%s</p><div id="stage">'''
 
-ENGINES = {
-    'native': "{ preferPlayback: 'native' }",
-    'startpos': "{ engine: { hlsJs: { startPosition: 0.05 } } }",
-    'pad0': "{ engine: { hlsJs: { skipBufferHolePadding: 0 } } }",
-}
-
-# Ways out of a film that is asked to play before its first data, tried one at a time with ?fix=
-FIXES = {
-    # the first play waits until there is something to play
-    'defer': '''
-      media.setAttribute('preload', 'auto');
-      var inner = media.shadowRoot.querySelector('video'), play = media.play;
-      media.play = function () {
-        if (inner.readyState >= 3) { delete media.play; return play.call(media); }
-        return new Promise(function (resolve, reject) {
-          inner.addEventListener('canplay', function () { delete media.play; play.call(media).then(resolve, reject); }, { once: true });
-        });
-      };''',
-    # a film that sits still with data ahead of it is seeked again, or paused and played
-    'reseek': "watch(media, function (v) { v.currentTime = v.currentTime + 0.001; });",
-    'pauseplay': "watch(media, function (v) { v.pause(); v.play(); });",
-}
-
 ARM = '''<script>
   // The address reaches the media element at the first gesture on the player, and no earlier.
   var stage = document.getElementById('stage');
-  function watch(media, fix) {
-    var inner = media.shadowRoot.querySelector('video'), last = -1, still = 0, tries = 0;
-    setInterval(function () {
-      if (inner.paused || tries >= 3) return;
-      var t = inner.currentTime, ahead = 0;
-      for (var i = 0; i < inner.buffered.length; i++) if (inner.buffered.start(i) <= t + 0.05 && inner.buffered.end(i) > t) ahead = inner.buffered.end(i) - t;
-      still = t === last && ahead > 1 ? still + 1 : 0;
-      last = t;
-      if (still >= 4) { still = 0; tries++; fix(inner); }
-    }, 250);
-  }
   function arm() {
     var media = stage.querySelector('mux-video');
-    if (media && !media.getAttribute('src') && media.dataset.src) {
-      %s
-      media.setAttribute('src', media.dataset.src);
-    }
+    if (media && !media.getAttribute('src') && media.dataset.src) media.setAttribute('src', media.dataset.src);
   }
-  %s.forEach(function (type) { stage.addEventListener(type, arm, { capture: true, passive: true }); });
+  ['pointerdown', 'touchstart', 'keydown', 'focusin'].forEach(function (type) { stage.addEventListener(type, arm, { capture: true, passive: true }); });
 </script>'''
 
 
@@ -151,13 +118,7 @@ def skin(media):
 STORYBOARD = '<track kind="metadata" label="thumbnails" default data-storyboard>'
 
 
-def lab_page(name, engine=None, fix=None, on=None, tracks=None):
-    if fix and fix.endswith('-up'):  # a single parameter, so the address needs no quoting in a shell
-        fix, on = fix[:-3], 'up'
-    source = 'media.source = %s;' % ENGINES[engine] if engine in ENGINES else ''
-    source += FIXES.get(fix, '')
-    # which events hand the address over: by default the earliest ones, with ?on=up only a finished gesture
-    events = "['pointerup', 'keydown']" if on == 'up' else "['pointerdown', 'touchstart', 'keydown', 'focusin']"
+def lab_page(name, tracks=None):
     track = '<track kind="chapters" label="English" srclang="en" src="/lab/chapters.vtt" default>'
     # ?tracks=none leaves the chapters out; ?tracks=storyboard also places the track <mux-video> would otherwise add
     # when the address arrives (it then only fills in that track's address, and re-inserts nothing)
@@ -171,19 +132,16 @@ def lab_page(name, engine=None, fix=None, on=None, tracks=None):
         return HEAD % (name, 'Address in the markup.') + '<video-player>' + skin(media) + '</video-player></div></main>' + module
     if name == 'late':
         media = '<mux-video data-src="%s" preload="none" playsinline crossorigin>%s</mux-video>' % (SRC, track)
-        return HEAD % (name, 'Address at the first gesture.') + '<video-player>' + skin(media) + '</video-player></div></main>' + module + ARM % (source, events)
+        return HEAD % (name, 'Address at the first gesture.') + '<video-player>' + skin(media) + '</video-player></div></main>' + module + ARM
     if name == 'js':
-        media = '<mux-video playsinline crossorigin>%s</mux-video>' % track
+        media = '<mux-video src="%s" playsinline crossorigin>%s</mux-video>' % (SRC, track)
         script = '''<script type="module">
   import '/embed/red-thread.js';
   const player = document.createElement('video-player');
   player.innerHTML = %s;
   document.getElementById('stage').append(player);
-  const media = document.querySelector('mux-video');
-  %s
-  media.preload = 'metadata';
-  media.src = %s;
-</script>''' % (json.dumps(skin(media)).replace('</', '<\\/'), source, json.dumps(SRC))
+  document.querySelector('mux-video').preload = 'metadata';
+</script>''' % json.dumps(skin(media)).replace('</', '<\\/')
         return HEAD % (name, 'Player made by a script.') + '</div></main>' + script
     return None
 
@@ -226,7 +184,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if path == '/hlsjs/hls.min.js':
             return self.send(200, open(os.path.join(ROOT, 'node_modules/hls.js/dist/hls.min.js'), 'rb').read(), 'text/javascript')
         if path.startswith('/lab/'):
-            page = lab_page(path[5:], *[query.get(k, [None])[0] for k in ('engine', 'fix', 'on', 'tracks')])
+            page = lab_page(path[5:], query.get('tracks', [None])[0])
             return self.send(200, page, 'text/html; charset=utf-8') if page else self.send(404, 'no such lab page', 'text/plain')
         if path.startswith('/embed/'):
             file = os.path.normpath(os.path.join(ROOT, 'dist-embed', path[7:]))

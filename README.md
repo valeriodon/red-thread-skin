@@ -48,7 +48,7 @@ The skin is the four files in `src/video/`: `skin.html` (the markup), `skin.css`
    document.body.append(player);
    ```
 
-   `apps/preview/src/frame/player.ts` is this same code, as the demo runs it.
+   `apps/preview/src/frame/player.ts` is this same code, as the demo runs it, with one precaution for Safari added (see [In Safari](#in-safari)).
 
 ### Without a bundler
 
@@ -113,6 +113,15 @@ Every control is a real Video.js element under the drawing, so Tab reaches capti
 ### Reduced motion
 
 With `prefers-reduced-motion: reduce` nothing springs, swings or stretches: the thread and the cord jump to their place, captions appear without the wipe, fullscreen opens without the four threads, and a still ring around the bead stands in for the bump while the video buffers.
+
+### In Safari
+
+Two things came up while testing in Safari (26 on an iPhone, 27 on a Mac). Neither is in the skin: both are in the layers under it, Video.js 10.3 and hls.js 1.7, and a bare `<video-player>` with `<mux-video>` shows them too. Both leave a film that has loaded standing at its first frame.
+
+- **Play with nothing loaded.** This film's sound begins 21 ms after its picture, and hls.js steps over that with a seek when a film that should be playing has not moved yet. With `preload="none"`, or a quick hand, the seek can land before Safari has its first frame; on a Mac Safari then reports the film as playing and leaves it at 0.12 s. The demo makes the first play wait for the first data: `holdFirstPlay` in `apps/preview/src/frame/player.ts`.
+- **An address that arrives late.** If `src` reaches `<mux-video>` after its `<track>` children have loaded (a page that asks nothing of the video host until the first gesture), the element adds its storyboard track and, with it, puts every other track back into the video. Safari sets a track that is put back to loading and never finishes it, and it holds a film at its first frame while a track is loading. Put the storyboard track in the markup yourself, empty, and the element only fills in its address: `<track kind="metadata" label="thumbnails" default data-storyboard>`.
+
+`tools/ios-check/` has what found them: a check in Safari on an iPhone simulator with real touches, one in Safari on a Mac (both run from the Actions tab), and a small lab that serves the player layer by layer.
 
 ## How it is built
 
